@@ -47,7 +47,6 @@ describe("model catalog", () => {
         capabilities: {
           referenceImages: true,
           resolutions: ["1K", "2K"],
-          aspectRatios: [],
         },
       },
     ]);
@@ -81,6 +80,43 @@ describe("model catalog", () => {
     await expect(catalog.load()).resolves.toMatchObject({
       stale: true,
       error: "Unavailable",
+    });
+  });
+
+  it("sends only effective OpenRouter options", async () => {
+    const fetchImplementation = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [{ b64_json: "iVBORw0KGgo=" }],
+        }),
+      ),
+    );
+    const provider = createOpenRouterProvider(
+      parseConfig({ NODE_ENV: "test", OPENROUTER_API_KEY: "test-key" }),
+      fetchImplementation,
+    );
+
+    await provider.generateImages?.({
+      modelId: "acme/image-maker",
+      prompt: "Test",
+      count: 1,
+      quality: "high",
+      background: "transparent",
+      outputFormat: "webp",
+      outputCompression: 80,
+      references: [],
+    });
+
+    expect(
+      JSON.parse(String(fetchImplementation.mock.calls[0]?.[1]?.body)),
+    ).toEqual({
+      model: "acme/image-maker",
+      prompt: "Test",
+      n: 1,
+      quality: "high",
+      background: "transparent",
+      output_format: "webp",
+      output_compression: 80,
     });
   });
 });

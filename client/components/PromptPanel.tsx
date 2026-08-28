@@ -3,10 +3,14 @@ export function PromptPanel({
   draft,
   onDraftChange,
   onGenerate,
+  generationBlocked,
+  generationBlockMessage,
 }: {
   draft: SessionDraft;
   onDraftChange: (draft: SessionDraft) => void;
   onGenerate: () => void;
+  generationBlocked: boolean;
+  generationBlockMessage: string | undefined;
 }) {
   return (
     <section class="border-base-300 focus-within:border-base-content/35 flex min-h-80 flex-col overflow-hidden rounded-box border bg-base-100 shadow-sm transition-colors">
@@ -23,7 +27,12 @@ export function PromptPanel({
         onKeyDown={(event) => {
           if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
             event.preventDefault();
-            if (draft.prompt.trim() && draft.models.length) onGenerate();
+            if (
+              draft.prompt.trim() &&
+              draft.models.length &&
+              !generationBlocked
+            )
+              onGenerate();
           }
         }}
       />
@@ -34,12 +43,19 @@ export function PromptPanel({
         <button
           class="btn btn-primary min-w-28"
           type="button"
-          disabled={!draft.prompt.trim() || !draft.models.length}
+          disabled={
+            !draft.prompt.trim() || !draft.models.length || generationBlocked
+          }
           onClick={onGenerate}
         >
           Generate
         </button>
       </div>
+      {generationBlockMessage && (
+        <p class="bg-error/10 text-error px-4 py-2 text-xs sm:px-5">
+          {generationBlockMessage}
+        </p>
+      )}
     </section>
   );
 }

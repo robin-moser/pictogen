@@ -8,6 +8,11 @@ import {
   GenerationRunSchema,
 } from "../../shared/contracts.js";
 import type { CreateRun } from "../../shared/contracts.js";
+import {
+  getReferenceLimitErrors,
+  resolveEffectiveOptions,
+} from "../../shared/capabilities.js";
+import type { ImageModel } from "../../shared/contracts.js";
 import { resolveUser } from "../auth.js";
 import type { AppDatabase } from "../db.js";
 import {
@@ -93,27 +98,27 @@ export function registerGenerationRoutes(
             message: "One or more selected models are unavailable.",
           },
         });
-      const incompatible = selectedModels.find(
-        (model) =>
-          model &&
-          ((model.capabilities?.resolutions &&
-            !model.capabilities.resolutions.includes(
-              request.body.options.resolution,
-            )) ||
-            (model.capabilities?.aspectRatios &&
-              !model.capabilities.aspectRatios.includes(
-                request.body.options.aspectRatio,
-              )) ||
-            (request.body.referenceAssetIds.length > 0 &&
-              model.capabilities?.referenceImages === false)),
+      const models = selectedModels as ImageModel[];
+      const referenceLimitErrors = getReferenceLimitErrors(
+        {
+          ...request.body.options,
+          prompt: request.body.prompt,
+          models: request.body.models,
+          count: request.body.count,
+          referenceAssetIds: request.body.referenceAssetIds,
+        },
+        models,
       );
-      if (incompatible)
+      if (referenceLimitErrors.length)
         return reply.code(400).send({
           error: {
             code: "MODEL_OPTION_UNSUPPORTED",
-            message: `${incompatible.name} does not support the selected generation settings.`,
+            message: referenceLimitErrors[0] ?? "Reference limit exceeded.",
           },
         });
+      const effectiveOptions = models.map(
+        (model) => resolveEffectiveOptions(model, request.body.options).options,
+      );
       const references = request.body.referenceAssetIds.length
         ? database.orm
             .select({ id: assets.id })
@@ -155,7 +160,7 @@ export function registerGenerationRoutes(
           })
           .run();
         request.body.models.forEach((model, modelIndex) => {
-          const modelName = selectedModels[modelIndex]?.name;
+          const modelName = models[modelIndex]?.name;
           if (!modelName) throw new Error("The selected model is unavailable.");
           for (
             let imageIndex = 0;
@@ -174,6 +179,9 @@ export function registerGenerationRoutes(
                 providerId: model.providerId,
                 modelId: model.modelId,
                 modelName,
+                effectiveOptionsJson: JSON.stringify(
+                  effectiveOptions[modelIndex],
+                ),
                 requestedCount: 1,
                 completedCount: 0,
                 status: "queued",
@@ -303,7 +311,7 @@ export function registerGenerationRoutes(
         });
       }
 
-      if (job.status !== "failed" && job.status !== "partial") {
+      if (job.status !== "failed") {
         return reply.code(409).send({
           error: {
             code: "JOB_NOT_DISMISSIBLE",
@@ -374,7 +382,7 @@ export function registerGenerationRoutes(
           and(
             eq(generationJobs.sessionId, session.id),
             eq(generationJobs.ownerId, ownerId),
-            inArray(generationJobs.status, ["failed", "partial"]),
+            inArray(generationJobs.status, ["failed"]),
             isNull(generationJobs.hiddenAt),
           ),
         )
@@ -415,6 +423,7 @@ export function runDetail(database: AppDatabase, runId: string) {
       providerId: job.providerId,
       modelId: job.modelId,
       modelName: job.modelName,
+      effectiveOptions: JSON.parse(job.effectiveOptionsJson),
       requestedCount: job.requestedCount,
       completedCount: job.completedCount,
       status: job.status,

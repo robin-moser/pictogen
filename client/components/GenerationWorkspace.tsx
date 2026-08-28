@@ -1,4 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
+import { getReferenceLimitErrors } from "../../shared/capabilities.js";
 import { listModels } from "../api.js";
 import type {
   Asset,
@@ -56,6 +57,7 @@ export function GenerationWorkspace({
   const [modelError, setModelError] = useState<string | null>(null);
   const [catalogStale, setCatalogStale] = useState(false);
   const [galleryColumns, setGalleryColumns] = useState(3);
+  const referenceLimitErrors = getReferenceLimitErrors(draft, models);
   useEffect(() => {
     if (!session) return;
     const controller = new AbortController();
@@ -178,6 +180,8 @@ export function GenerationWorkspace({
                 draft={draft}
                 onDraftChange={onDraftChange}
                 onGenerate={onGenerate}
+                generationBlocked={referenceLimitErrors.length > 0}
+                generationBlockMessage={referenceLimitErrors[0]}
               />
             </div>
             <OutputSection
@@ -196,6 +200,7 @@ export function GenerationWorkspace({
             modelSearch={modelSearch}
             catalogStale={catalogStale}
             modelError={modelError}
+            referenceLimitErrors={referenceLimitErrors}
             onDraftChange={onDraftChange}
             onModelSearch={setModelSearch}
             onToggleModel={toggleModel}

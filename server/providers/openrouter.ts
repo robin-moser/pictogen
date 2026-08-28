@@ -17,6 +17,9 @@ type OpenRouterCatalog = { data?: OpenRouterModel[] };
 
 type Resolution = "512" | "1K" | "2K" | "4K";
 type AspectRatio = "1:1" | "16:9" | "9:16" | "4:3" | "3:4" | "3:2" | "2:3";
+type Quality = "auto" | "low" | "medium" | "high";
+type Background = "auto" | "transparent" | "opaque";
+type OutputFormat = "png" | "jpeg" | "webp";
 
 function isImageModel(model: OpenRouterModel) {
   return model.architecture?.output_modalities?.includes("image") === true;
@@ -26,7 +29,6 @@ export function createOpenRouterProvider(
   config: AppConfig,
   fetchImplementation: typeof fetch = fetch,
 ): ImageProvider {
-  const models = new Map<string, ImageModel>();
   return {
     id: "openrouter",
     displayName: "OpenRouter",
@@ -68,11 +70,36 @@ export function createOpenRouterProvider(
                 value,
               ),
           ) as AspectRatio[] | undefined;
+          const qualities = parameters?.quality?.values?.filter((value) =>
+            ["auto", "low", "medium", "high"].includes(value),
+          ) as Quality[] | undefined;
+          const backgrounds = parameters?.background?.values?.filter((value) =>
+            ["auto", "transparent", "opaque"].includes(value),
+          ) as Background[] | undefined;
+          const outputFormats = parameters?.output_format?.values?.filter(
+            (value) => ["png", "jpeg", "webp"].includes(value),
+          ) as OutputFormat[] | undefined;
+          const compression = parameters?.output_compression;
           const capabilities = parameters
             ? {
                 referenceImages: Boolean(parameters.input_references),
-                resolutions: resolutions ?? [],
-                aspectRatios: aspectRatios ?? [],
+                ...(parameters.input_references?.max !== undefined
+                  ? { maxReferenceImages: parameters.input_references.max }
+                  : {}),
+                ...(resolutions ? { resolutions } : {}),
+                ...(aspectRatios ? { aspectRatios } : {}),
+                ...(qualities ? { qualities } : {}),
+                ...(backgrounds ? { backgrounds } : {}),
+                ...(outputFormats ? { outputFormats } : {}),
+                ...(typeof compression?.min === "number" &&
+                typeof compression.max === "number"
+                  ? {
+                      outputCompression: {
+                        minimum: compression.min,
+                        maximum: compression.max,
+                      },
+                    }
+                  : {}),
                 ...(parameters.n?.max
                   ? { maxImagesPerRequest: parameters.n.max }
                   : {}),
@@ -91,12 +118,9 @@ export function createOpenRouterProvider(
             ...(capabilities ? { capabilities } : {}),
           };
         });
-      models.clear();
-      for (const model of imageModels) models.set(model.modelId, model);
       return imageModels;
     },
     async generateImages(request, signal) {
-      const capabilities = models.get(request.modelId)?.capabilities;
       const response = await fetchImplementation(
         "https://openrouter.ai/api/v1/images",
         {
@@ -111,22 +135,19 @@ export function createOpenRouterProvider(
             model: request.modelId,
             prompt: request.prompt,
             n: request.count,
-            ...(request.resolution &&
-            (!capabilities?.resolutions ||
-              capabilities.resolutions.includes(
-                request.resolution as Resolution,
-              ))
-              ? { resolution: request.resolution }
-              : {}),
-            ...(request.aspectRatio &&
-            (!capabilities?.aspectRatios ||
-              capabilities.aspectRatios.includes(
-                request.aspectRatio as AspectRatio,
-              ))
+            ...(request.resolution ? { resolution: request.resolution } : {}),
+            ...(request.aspectRatio
               ? { aspect_ratio: request.aspectRatio }
               : {}),
-            ...(request.references.length &&
-            capabilities?.referenceImages !== false
+            ...(request.quality ? { quality: request.quality } : {}),
+            ...(request.background ? { background: request.background } : {}),
+            ...(request.outputFormat
+              ? { output_format: request.outputFormat }
+              : {}),
+            ...(request.outputCompression !== undefined
+              ? { output_compression: request.outputCompression }
+              : {}),
+            ...(request.references.length
               ? {
                   input_references: request.references.map(
                     (reference) =>

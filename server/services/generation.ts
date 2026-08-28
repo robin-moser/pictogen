@@ -48,9 +48,13 @@ export function createGenerationWorker(
         .where(eq(generationRuns.id, job.runId))
         .get();
       if (!run) throw new Error("The generation run is unavailable.");
-      const options = JSON.parse(run.optionsJson) as {
-        resolution: string;
-        aspectRatio: string;
+      const options = JSON.parse(job.effectiveOptionsJson) as {
+        resolution?: string;
+        aspectRatio?: string;
+        quality?: string;
+        background?: string;
+        outputFormat?: string;
+        outputCompression?: number;
       };
       const references = database.orm
         .select({ mimeType: assets.mimeType, storagePath: assets.storagePath })
@@ -69,8 +73,14 @@ export function createGenerationWorker(
         modelId: job.modelId,
         prompt: run.prompt,
         count: job.requestedCount,
-        resolution: options.resolution,
-        aspectRatio: options.aspectRatio,
+        ...(options.resolution ? { resolution: options.resolution } : {}),
+        ...(options.aspectRatio ? { aspectRatio: options.aspectRatio } : {}),
+        ...(options.quality ? { quality: options.quality } : {}),
+        ...(options.background ? { background: options.background } : {}),
+        ...(options.outputFormat ? { outputFormat: options.outputFormat } : {}),
+        ...(options.outputCompression !== undefined
+          ? { outputCompression: options.outputCompression }
+          : {}),
         references: referenceBytes,
       });
       returnedCost = costToMicrousd(result.usage?.cost);
@@ -120,7 +130,7 @@ export function createGenerationWorker(
         database.orm
           .update(generationJobs)
           .set({
-            status: current.completedCount ? "partial" : "failed",
+            status: "failed",
             costMicrousd: returnedCost,
             costComplete: returnedCost !== null,
             usageJson: returnedUsage,

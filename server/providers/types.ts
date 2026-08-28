@@ -11,6 +11,10 @@ export type ImageProvider = {
       count: number;
       resolution?: string;
       aspectRatio?: string;
+      quality?: string;
+      background?: string;
+      outputFormat?: string;
+      outputCompression?: number;
       references: Array<{ mimeType: string; bytes: Buffer }>;
     },
     signal?: AbortSignal,

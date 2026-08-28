@@ -303,6 +303,18 @@ export function App() {
         options: {
           resolution: draftRef.current.resolution,
           aspectRatio: draftRef.current.aspectRatio,
+          ...(draftRef.current.quality
+            ? { quality: draftRef.current.quality }
+            : {}),
+          ...(draftRef.current.background
+            ? { background: draftRef.current.background }
+            : {}),
+          ...(draftRef.current.outputFormat
+            ? { outputFormat: draftRef.current.outputFormat }
+            : {}),
+          ...(draftRef.current.outputCompression !== undefined
+            ? { outputCompression: draftRef.current.outputCompression }
+            : {}),
         },
         referenceAssetIds: draftRef.current.referenceAssetIds,
       });

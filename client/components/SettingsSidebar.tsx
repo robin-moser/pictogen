@@ -1,4 +1,5 @@
 import type { ImageModel, SessionDraft } from "../../shared/contracts.js";
+import { resolveEffectiveOptions } from "../../shared/capabilities.js";
 import { Fragment } from "preact/jsx-runtime";
 import { useRef } from "preact/hooks";
 type Props = {
@@ -7,6 +8,7 @@ type Props = {
   modelSearch: string;
   catalogStale: boolean;
   modelError: string | null;
+  referenceLimitErrors: string[];
   onDraftChange: (draft: SessionDraft) => void;
   onModelSearch: (value: string) => void;
   onToggleModel: (model: ImageModel) => void;
@@ -17,6 +19,7 @@ export function SettingsSidebar({
   modelSearch,
   catalogStale,
   modelError,
+  referenceLimitErrors,
   onDraftChange,
   onModelSearch,
   onToggleModel,
@@ -34,11 +37,16 @@ export function SettingsSidebar({
           .includes(modelSearch.trim().toLocaleLowerCase()),
       ),
   );
-  const selectedVisible = visible.filter((model) =>
+  const selectedModels = models.filter((model) =>
     selected.has(`${model.providerId}:${model.modelId}`),
   );
   const availableVisible = visible.filter(
     (model) => !selected.has(`${model.providerId}:${model.modelId}`),
+  );
+  const capabilityWarnings = selectedModels.flatMap((model) =>
+    resolveEffectiveOptions(model, draft).changes.map(
+      (change) => `${model.name}: ${change}.`,
+    ),
   );
   return (
     <aside
@@ -114,6 +122,112 @@ export function SettingsSidebar({
       </div>
       <section
         class="border-base-300 mt-7 border-t pt-5"
+        aria-labelledby="output-heading"
+      >
+        <h3 id="output-heading" class="font-semibold">
+          Output
+        </h3>
+        <div class="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-1">
+          <label class="grid gap-2 text-xs font-semibold">
+            Quality
+            <select
+              class="select w-full font-normal"
+              value={draft.quality ?? ""}
+              onChange={(event) =>
+                event.currentTarget.value
+                  ? onDraftChange({
+                      ...draft,
+                      quality: event.currentTarget.value as NonNullable<
+                        SessionDraft["quality"]
+                      >,
+                    })
+                  : (() => {
+                      const { quality: _, ...nextDraft } = draft;
+                      onDraftChange(nextDraft);
+                    })()
+              }
+            >
+              <option value="">Model default</option>
+              <option value="auto">Auto</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+          <label class="grid gap-2 text-xs font-semibold">
+            Background
+            <select
+              class="select w-full font-normal"
+              value={draft.background ?? ""}
+              onChange={(event) =>
+                event.currentTarget.value
+                  ? onDraftChange({
+                      ...draft,
+                      background: event.currentTarget.value as NonNullable<
+                        SessionDraft["background"]
+                      >,
+                    })
+                  : (() => {
+                      const { background: _, ...nextDraft } = draft;
+                      onDraftChange(nextDraft);
+                    })()
+              }
+            >
+              <option value="">Model default</option>
+              <option value="auto">Auto</option>
+              <option value="transparent">Transparent</option>
+              <option value="opaque">Opaque</option>
+            </select>
+          </label>
+          <label class="grid gap-2 text-xs font-semibold">
+            File format
+            <select
+              class="select w-full font-normal"
+              value={draft.outputFormat ?? ""}
+              onChange={(event) =>
+                event.currentTarget.value
+                  ? onDraftChange({
+                      ...draft,
+                      outputFormat: event.currentTarget.value as NonNullable<
+                        SessionDraft["outputFormat"]
+                      >,
+                    })
+                  : (() => {
+                      const { outputFormat: _, ...nextDraft } = draft;
+                      onDraftChange(nextDraft);
+                    })()
+              }
+            >
+              <option value="">Model default</option>
+              <option value="png">PNG</option>
+              <option value="jpeg">JPEG</option>
+              <option value="webp">WebP</option>
+            </select>
+          </label>
+          <label class="grid gap-2 text-xs font-semibold">
+            Compression
+            <input
+              class="input w-full font-normal"
+              type="number"
+              min="0"
+              max="100"
+              value={draft.outputCompression ?? ""}
+              placeholder="Model default"
+              onInput={(event) => {
+                const value = event.currentTarget.value;
+                if (value) {
+                  onDraftChange({ ...draft, outputCompression: Number(value) });
+                } else {
+                  const { outputCompression: _, ...nextDraft } = draft;
+                  onDraftChange(nextDraft);
+                }
+              }}
+            />
+          </label>
+        </div>
+      </section>
+      <section
+        class="border-base-300 mt-7 border-t pt-5"
         aria-labelledby="models-heading"
       >
         <div class="flex items-baseline justify-between gap-4">
@@ -159,13 +273,13 @@ export function SettingsSidebar({
               tabIndex={-1}
               class="dropdown-content menu bg-base-100 rounded-box z-10 mt-1 max-h-64 w-full flex-nowrap overflow-y-auto p-2 shadow"
             >
-              {[...selectedVisible, ...availableVisible].map((model, index) => {
+              {[...selectedModels, ...availableVisible].map((model, index) => {
                 const isSelected = selected.has(
                   `${model.providerId}:${model.modelId}`,
                 );
                 return (
                   <Fragment key={`${model.providerId}:${model.modelId}`}>
-                    {index === selectedVisible.length &&
+                    {index === selectedModels.length &&
                       availableVisible.length > 0 && (
                         <li role="separator" class="divider my-1 h-px" />
                       )}
@@ -186,6 +300,18 @@ export function SettingsSidebar({
           </details>
         )}
       </section>
+      {(referenceLimitErrors.length > 0 || capabilityWarnings.length > 0) && (
+        <div class="alert alert-warning mt-7 items-start rounded-box py-3 text-xs leading-5">
+          <div>
+            {referenceLimitErrors.map((message) => (
+              <p key={message}>{message}</p>
+            ))}
+            {capabilityWarnings.map((warning) => (
+              <p key={warning}>{warning}</p>
+            ))}
+          </div>
+        </div>
+      )}
       <div class="border-base-300 text-base-content/50 mt-7 border-t pt-5 text-xs leading-5">
         Autosave enabled
       </div>

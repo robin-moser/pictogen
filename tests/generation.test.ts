@@ -326,6 +326,86 @@ describe("generation API", () => {
     await app.close();
   });
 
+  it("persists effective settings and rejects explicit reference-limit violations", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "pictogen-generation-"));
+    directories.push(dataDir);
+    const config = parseConfig({
+      NODE_ENV: "test",
+      DATA_DIR: dataDir,
+      OPENROUTER_API_KEY: "test-key",
+    });
+    const app = await buildApp({
+      config,
+      database: openDatabase({ databasePath: config.databasePath }),
+      provider: {
+        id: "test",
+        displayName: "Test",
+        listImageModels: async () => [
+          {
+            providerId: "test",
+            modelId: "qwen",
+            name: "Qwen",
+            inputModalities: ["text"],
+            capabilities: {
+              maxReferenceImages: 1,
+              resolutions: ["1K", "2K"],
+              aspectRatios: ["1:1", "3:2"],
+              qualities: ["low", "medium"],
+            },
+          },
+        ],
+      },
+    });
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      payload: { title: "Effective options" },
+    });
+    const sessionId = created.json<{ id: string }>().id;
+
+    const rejected = await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/runs`,
+      headers: { "idempotency-key": "too-many-references" },
+      payload: {
+        prompt: "Too many references",
+        models: [{ providerId: "test", modelId: "qwen" }],
+        count: 1,
+        options: { resolution: "4K", aspectRatio: "3:2" },
+        referenceAssetIds: ["one", "two"],
+      },
+    });
+    expect(rejected.statusCode).toBe(400);
+    expect(rejected.json()).toMatchObject({
+      error: { message: "Qwen accepts at most 1 reference." },
+    });
+
+    const accepted = await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/runs`,
+      headers: { "idempotency-key": "effective-options" },
+      payload: {
+        prompt: "Map settings",
+        models: [{ providerId: "test", modelId: "qwen" }],
+        count: 1,
+        options: { resolution: "4K", aspectRatio: "3:2", quality: "high" },
+        referenceAssetIds: [],
+      },
+    });
+    expect(accepted.statusCode).toBe(202);
+    expect(accepted.json()).toMatchObject({
+      run: {
+        options: { resolution: "4K", aspectRatio: "3:2", quality: "high" },
+        jobs: [
+          {
+            effectiveOptions: { resolution: "2K", aspectRatio: "3:2" },
+          },
+        ],
+      },
+    });
+    await app.close();
+  });
+
   it("hides failed log entries without removing their known cost", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "pictogen-generation-"));
     directories.push(dataDir);

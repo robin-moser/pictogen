@@ -33,15 +33,9 @@ export function OutputSection({
   const jobs = session.runs.flatMap((run) =>
     run.jobs.map((job) => ({ job, run })),
   );
-  const failures = jobs.filter(
-    ({ job }) => job.status === "failed" || job.status === "partial",
-  );
+  const failures = jobs.filter(({ job }) => job.status === "failed");
   const galleryItems = jobs.flatMap(({ job, run }) => {
-    if (
-      job.status === "failed" ||
-      job.status === "partial" ||
-      job.status === "cancelled"
-    ) {
+    if (job.status === "failed" || job.status === "cancelled") {
       return [];
     }
 
@@ -175,13 +169,11 @@ export function OutputSection({
                   <div class="min-w-0 grow">
                     <div class="flex flex-wrap items-center gap-2">
                       <span class="font-medium">{job.modelName}</span>
-                      <span class="badge badge-error badge-sm">
-                        {job.status === "partial" ? "Partial" : "Failed"}
-                      </span>
+                      <span class="badge badge-error badge-sm">Failed</span>
                     </div>
                     <p class="text-base-content/45 mt-0.5 truncate text-xs">
                       {job.providerId} / {job.modelId} ·{" "}
-                      {run.options.resolution} · {run.options.aspectRatio} ·{" "}
+                      {formatEffectiveOptions(job)} ·{" "}
                       {formatDate(job.createdAt)}
                     </p>
                     <p class="text-error mt-2 text-sm">
@@ -237,10 +229,7 @@ export function OutputSection({
                   <span>
                     {lightboxImage.job.providerId} / {lightboxImage.job.modelId}
                   </span>
-                  <span>
-                    {lightboxImage.run.options.resolution} ·{" "}
-                    {lightboxImage.run.options.aspectRatio}
-                  </span>
+                  <span>{formatEffectiveOptions(lightboxImage.job)}</span>
                   <span>{formatCost(lightboxImage.job)}</span>
                   <time dateTime={lightboxImage.job.createdAt}>
                     {formatDate(lightboxImage.job.createdAt)}
@@ -392,7 +381,7 @@ function GalleryItem({
             {job.providerId} / {job.modelId}
           </p>
           <p class="mt-1 text-white/80">
-            {run.options.resolution} · {run.options.aspectRatio} ·{" "}
+            {formatEffectiveOptions(job)} ·{" "}
             {output
               ? formatCost(job)
               : job.status === "running"
@@ -419,6 +408,22 @@ function formatCost(job: Job) {
     maximumFractionDigits: 6,
   }).format(job.costMicrousd / 1_000_000);
   return job.costComplete ? cost : `${cost} known`;
+}
+
+function formatEffectiveOptions(job: Job) {
+  const options = job.effectiveOptions;
+  return [
+    options.resolution ?? "Resolution not sent",
+    options.aspectRatio ?? "Aspect ratio not sent",
+    options.quality,
+    options.background,
+    options.outputFormat?.toUpperCase(),
+    options.outputCompression !== undefined
+      ? `Compression ${options.outputCompression}`
+      : undefined,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(" · ");
 }
 
 function formatDate(value: string) {

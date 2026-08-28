@@ -26,12 +26,37 @@ export const AspectRatioSchema = Type.Union([
   Type.Literal("2:3"),
 ]);
 
+export const QualitySchema = Type.Union([
+  Type.Literal("auto"),
+  Type.Literal("low"),
+  Type.Literal("medium"),
+  Type.Literal("high"),
+]);
+
+export const BackgroundSchema = Type.Union([
+  Type.Literal("auto"),
+  Type.Literal("transparent"),
+  Type.Literal("opaque"),
+]);
+
+export const OutputFormatSchema = Type.Union([
+  Type.Literal("png"),
+  Type.Literal("jpeg"),
+  Type.Literal("webp"),
+]);
+
 export const SessionDraftSchema = Type.Object(
   {
     prompt: Type.String({ maxLength: 12_000 }),
     models: Type.Array(ModelSelectionSchema, { maxItems: 3 }),
     resolution: ResolutionSchema,
     aspectRatio: AspectRatioSchema,
+    quality: Type.Optional(QualitySchema),
+    background: Type.Optional(BackgroundSchema),
+    outputFormat: Type.Optional(OutputFormatSchema),
+    outputCompression: Type.Optional(
+      Type.Integer({ minimum: 0, maximum: 100 }),
+    ),
     count: Type.Integer({ minimum: 1, maximum: 10 }),
     referenceAssetIds: Type.Array(Type.String({ minLength: 1 }), {
       maxItems: 20,
@@ -65,7 +90,6 @@ export const JobStatusSchema = Type.Union([
   Type.Literal("queued"),
   Type.Literal("running"),
   Type.Literal("succeeded"),
-  Type.Literal("partial"),
   Type.Literal("failed"),
   Type.Literal("cancelled"),
 ]);
@@ -78,6 +102,19 @@ export const GenerationJobSchema = Type.Object(
     providerId: Type.String(),
     modelId: Type.String(),
     modelName: Type.String(),
+    effectiveOptions: Type.Object(
+      {
+        resolution: Type.Optional(ResolutionSchema),
+        aspectRatio: Type.Optional(AspectRatioSchema),
+        quality: Type.Optional(QualitySchema),
+        background: Type.Optional(BackgroundSchema),
+        outputFormat: Type.Optional(OutputFormatSchema),
+        outputCompression: Type.Optional(
+          Type.Integer({ minimum: 0, maximum: 100 }),
+        ),
+      },
+      { additionalProperties: false },
+    ),
     requestedCount: Type.Integer(),
     completedCount: Type.Integer(),
     status: JobStatusSchema,
@@ -98,6 +135,12 @@ export const GenerationRunSchema = Type.Object(
     options: Type.Object({
       resolution: ResolutionSchema,
       aspectRatio: AspectRatioSchema,
+      quality: Type.Optional(QualitySchema),
+      background: Type.Optional(BackgroundSchema),
+      outputFormat: Type.Optional(OutputFormatSchema),
+      outputCompression: Type.Optional(
+        Type.Integer({ minimum: 0, maximum: 100 }),
+      ),
     }),
     requestedCount: Type.Integer(),
     createdAt: Type.String(),
@@ -119,6 +162,12 @@ export const CreateRunSchema = Type.Object(
     options: Type.Object({
       resolution: ResolutionSchema,
       aspectRatio: AspectRatioSchema,
+      quality: Type.Optional(QualitySchema),
+      background: Type.Optional(BackgroundSchema),
+      outputFormat: Type.Optional(OutputFormatSchema),
+      outputCompression: Type.Optional(
+        Type.Integer({ minimum: 0, maximum: 100 }),
+      ),
     }),
     referenceAssetIds: Type.Array(Type.String({ minLength: 1 }), {
       maxItems: 20,
@@ -142,10 +191,19 @@ export const ImageModelSchema = Type.Object(
       Type.Object(
         {
           referenceImages: Type.Optional(Type.Boolean()),
-          maxReferenceImages: Type.Optional(Type.Integer({ minimum: 1 })),
+          maxReferenceImages: Type.Optional(Type.Integer({ minimum: 0 })),
           maxImagesPerRequest: Type.Optional(Type.Integer({ minimum: 1 })),
           resolutions: Type.Optional(Type.Array(ResolutionSchema)),
           aspectRatios: Type.Optional(Type.Array(AspectRatioSchema)),
+          qualities: Type.Optional(Type.Array(QualitySchema)),
+          backgrounds: Type.Optional(Type.Array(BackgroundSchema)),
+          outputFormats: Type.Optional(Type.Array(OutputFormatSchema)),
+          outputCompression: Type.Optional(
+            Type.Object({
+              minimum: Type.Integer({ minimum: 0, maximum: 100 }),
+              maximum: Type.Integer({ minimum: 0, maximum: 100 }),
+            }),
+          ),
         },
         { additionalProperties: false },
       ),
