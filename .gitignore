@@ -1,0 +1,6 @@
+# local data
+work/
+data/
+
+# general
+.DS_Store
