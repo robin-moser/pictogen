@@ -19,6 +19,7 @@ type GenerationWorkspaceProps = {
   onCreate: () => void;
   onReferenceUploaded: (asset: Asset) => void;
   onReferenceRemoved: (assetId: string) => Promise<boolean>;
+  onGenerate: () => void;
 };
 
 const saveLabels: Record<SaveStatus, string> = {
@@ -37,6 +38,7 @@ export function GenerationWorkspace({
   onCreate,
   onReferenceUploaded,
   onReferenceRemoved,
+  onGenerate,
 }: GenerationWorkspaceProps) {
   const [models, setModels] = useState<ImageModel[]>([]);
   const [modelSearch, setModelSearch] = useState("");
@@ -204,7 +206,23 @@ export function GenerationWorkspace({
               onInput={(event) =>
                 onDraftChange({ ...draft, prompt: event.currentTarget.value })
               }
+              onKeyDown={(event) => {
+                if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                  event.preventDefault();
+                  if (draft.prompt.trim() && draft.models.length) onGenerate();
+                }
+              }}
             />
+            <div class="mt-4 flex justify-end">
+              <button
+                class="btn btn-primary"
+                type="button"
+                disabled={!draft.prompt.trim() || !draft.models.length}
+                onClick={onGenerate}
+              >
+                Generate
+              </button>
+            </div>
 
             <section class="mt-7" aria-labelledby="models-heading">
               <div class="flex items-baseline justify-between gap-4">
@@ -469,6 +487,57 @@ export function GenerationWorkspace({
             </div>
           </aside>
         </section>
+        {session.runs.length > 0 && (
+          <section class="border-base-300 border-t px-5 py-7 sm:px-7">
+            <div class="mx-auto max-w-6xl">
+              <h2 class="text-lg font-semibold">Output</h2>
+              <div class="mt-4 grid gap-5">
+                {session.runs.map((run) => (
+                  <article key={run.id} class="border-base-300 border p-4">
+                    <p class="text-base-content/60 text-sm whitespace-pre-wrap">
+                      {run.prompt}
+                    </p>
+                    <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {run.jobs.map((job) => (
+                        <section key={job.id} class="bg-base-200/40 p-3">
+                          <div class="flex justify-between gap-2 text-sm">
+                            <strong>{job.modelName}</strong>
+                            <span>{job.status}</span>
+                          </div>
+                          {job.errorMessage && (
+                            <p class="text-error mt-2 text-xs">
+                              {job.errorMessage}
+                            </p>
+                          )}
+                          {job.outputs.length > 0 && (
+                            <div class="mt-3 grid grid-cols-2 gap-2">
+                              {job.outputs.map((output, index) => (
+                                <img
+                                  key={output.id}
+                                  class="bg-base-300 aspect-square w-full object-cover"
+                                  loading="lazy"
+                                  src={`/api/assets/${encodeURIComponent(output.id)}`}
+                                  alt={`Generated image ${index + 1} for ${job.modelName}`}
+                                />
+                              ))}
+                            </div>
+                          )}
+                          {(job.status === "queued" ||
+                            job.status === "running") && (
+                            <p class="text-base-content/60 mt-3 text-xs">
+                              {job.completedCount} / {job.requestedCount} images
+                              complete
+                            </p>
+                          )}
+                        </section>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
       </div>
     </main>
   );

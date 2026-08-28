@@ -15,6 +15,13 @@
       "when": 1787949461976,
       "tag": "0001_lean_the_santerians",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787949843684,
+      "tag": "0002_mixed_wildside",
+      "breakpoints": true
     }
   ]
 }

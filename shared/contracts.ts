@@ -61,6 +61,74 @@ export const AssetSchema = Type.Object(
 
 export type Asset = Static<typeof AssetSchema>;
 
+export const JobStatusSchema = Type.Union([
+  Type.Literal("queued"),
+  Type.Literal("running"),
+  Type.Literal("succeeded"),
+  Type.Literal("partial"),
+  Type.Literal("failed"),
+  Type.Literal("cancelled"),
+]);
+export type JobStatus = Static<typeof JobStatusSchema>;
+
+export const GenerationJobSchema = Type.Object(
+  {
+    id: Type.String(),
+    runId: Type.String(),
+    providerId: Type.String(),
+    modelId: Type.String(),
+    modelName: Type.String(),
+    requestedCount: Type.Integer(),
+    completedCount: Type.Integer(),
+    status: JobStatusSchema,
+    costMicrousd: Type.Union([Type.Integer({ minimum: 0 }), Type.Null()]),
+    costComplete: Type.Boolean(),
+    errorMessage: Type.Optional(Type.String()),
+    createdAt: Type.String(),
+    outputs: Type.Array(AssetSchema),
+  },
+  { additionalProperties: false },
+);
+export type GenerationJob = Static<typeof GenerationJobSchema>;
+
+export const GenerationRunSchema = Type.Object(
+  {
+    id: Type.String(),
+    prompt: Type.String(),
+    options: Type.Object({
+      resolution: ResolutionSchema,
+      aspectRatio: AspectRatioSchema,
+    }),
+    requestedCount: Type.Integer(),
+    createdAt: Type.String(),
+    jobs: Type.Array(GenerationJobSchema),
+  },
+  { additionalProperties: false },
+);
+export type GenerationRun = Static<typeof GenerationRunSchema>;
+
+export const CreateRunSchema = Type.Object(
+  {
+    prompt: Type.String({ minLength: 1, maxLength: 12_000 }),
+    models: Type.Array(ModelSelectionSchema, {
+      minItems: 1,
+      maxItems: 3,
+      uniqueItems: true,
+    }),
+    count: Type.Integer({ minimum: 1, maximum: 10 }),
+    options: Type.Object({
+      resolution: ResolutionSchema,
+      aspectRatio: AspectRatioSchema,
+    }),
+    referenceAssetIds: Type.Array(Type.String({ minLength: 1 }), {
+      maxItems: 20,
+      uniqueItems: true,
+    }),
+  },
+  { additionalProperties: false },
+);
+export type CreateRun = Static<typeof CreateRunSchema>;
+
 export const ImageModelSchema = Type.Object(
   {
     providerId: Type.String(),
@@ -121,6 +189,7 @@ export const SessionDetailSchema = Type.Intersect([
     {
       draft: SessionDraftSchema,
       references: Type.Array(AssetSchema),
+      runs: Type.Array(GenerationRunSchema),
     },
     { additionalProperties: false },
   ),

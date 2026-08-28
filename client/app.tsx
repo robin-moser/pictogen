@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 
 import {
   createSession,
+  createRun,
   deleteAsset,
   deleteSession,
   getIdentity,
@@ -71,6 +72,7 @@ export function App() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savePromiseRef = useRef<Promise<boolean> | null>(null);
   const sessionRequestRef = useRef(0);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function updateSessionList(detail: SessionDetail) {
     const summary = summaryFromDetail(detail);
@@ -235,6 +237,56 @@ export function App() {
   function changeDraft(nextDraft: SessionDraft) {
     draftRef.current = nextDraft;
     setDraft(nextDraft);
+  }
+
+  function refreshSession(sessionId: string) {
+    return getSession(sessionId).then((detail) => {
+      if (activeSessionRef.current?.id === detail.id) {
+        activeSessionRef.current = detail;
+        setActiveSession(detail);
+        updateSessionList(detail);
+      }
+      return detail;
+    });
+  }
+
+  useEffect(() => {
+    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    if (!activeSession || !activeSession.activeJobCount) return;
+    pollTimerRef.current = setTimeout(
+      () => {
+        void refreshSession(activeSession.id).catch(() => undefined);
+      },
+      document.hidden ? 8_000 : 2_000,
+    );
+    return () => {
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
+  }, [activeSession?.id, activeSession?.activeJobCount]);
+
+  async function handleGenerate() {
+    const session = activeSessionRef.current;
+    if (!session || !(await flushDraft())) return;
+    try {
+      setError(null);
+      await createRun(session.id, {
+        prompt: draftRef.current.prompt,
+        models: draftRef.current.models,
+        count: draftRef.current.count,
+        options: {
+          resolution: draftRef.current.resolution,
+          aspectRatio: draftRef.current.aspectRatio,
+        },
+        referenceAssetIds: draftRef.current.referenceAssetIds,
+      });
+      await refreshSession(session.id);
+    } catch (generationError) {
+      setError(
+        generationError instanceof Error
+          ? generationError.message
+          : "The generation could not be submitted.",
+      );
+    }
   }
 
   async function handleCreate(title: string) {
@@ -471,6 +523,7 @@ export function App() {
           onCreate={() => void handleCreate("Untitled session")}
           onReferenceUploaded={handleReferenceUploaded}
           onReferenceRemoved={handleReferenceRemoved}
+          onGenerate={() => void handleGenerate()}
         />
       </div>
 

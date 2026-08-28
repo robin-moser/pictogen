@@ -117,11 +117,57 @@ export function createAssetService(config: AppConfig, database: AppDatabase) {
           id,
           ownerId,
           sessionId,
+          jobId: null,
           kind: "reference",
           sha256: createHash("sha256").update(bytes).digest("hex"),
           storagePath,
           mimeType: imageType.mimeType,
           bytes: bytes.length,
+          ordinal: null,
+          createdAt: new Date().toISOString(),
+        };
+        database.orm.insert(assets).values(row).run();
+        return assetFromRow(row);
+      } catch (error) {
+        await Promise.all([
+          rm(path, { force: true }),
+          rm(temporaryPath, { force: true }),
+        ]);
+        throw error;
+      }
+    },
+    async createOutput(
+      sessionId: string,
+      ownerId: string,
+      jobId: string,
+      ordinal: number,
+      bytes: Buffer,
+    ) {
+      const imageType = detectImageType(bytes);
+      if (!imageType) {
+        throw new AssetValidationError(
+          "The provider returned an unsupported image.",
+        );
+      }
+      const id = randomUUID();
+      const storagePath = `${id}.${imageType.extension}`;
+      const path = safeAssetPath(config, storagePath);
+      const temporaryPath = `${path}.tmp`;
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(temporaryPath, bytes, { flag: "wx" });
+      try {
+        await rename(temporaryPath, path);
+        const row = {
+          id,
+          ownerId,
+          sessionId,
+          jobId,
+          kind: "output" as const,
+          sha256: createHash("sha256").update(bytes).digest("hex"),
+          storagePath,
+          mimeType: imageType.mimeType,
+          bytes: bytes.length,
+          ordinal,
           createdAt: new Date().toISOString(),
         };
         database.orm.insert(assets).values(row).run();

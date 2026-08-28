@@ -19,9 +19,14 @@ import type {
 } from "../../shared/contracts.js";
 import { resolveUser } from "../auth.js";
 import type { AppDatabase } from "../db.js";
-import { sessions } from "../db/schema.js";
-import { assets } from "../db/schema.js";
+import {
+  assets,
+  generationJobs,
+  generationRuns,
+  sessions,
+} from "../db/schema.js";
 import type { createAssetService } from "../services/assets.js";
+import { runDetail } from "./generation.js";
 
 const SessionParamsSchema = Type.Object({
   sessionId: Type.String({ minLength: 1 }),
@@ -49,26 +54,54 @@ type CreateSessionBody = Static<typeof CreateSessionBodySchema>;
 type UpdateSessionBody = Static<typeof UpdateSessionBodySchema>;
 type SessionRow = typeof sessions.$inferSelect;
 
-function summaryFromRow(row: SessionRow): SessionSummary {
+function summaryFromRow(
+  database: AppDatabase,
+  row: SessionRow,
+): SessionSummary {
+  const jobs = database.orm
+    .select({
+      status: generationJobs.status,
+      costMicrousd: generationJobs.costMicrousd,
+      costComplete: generationJobs.costComplete,
+    })
+    .from(generationJobs)
+    .where(eq(generationJobs.sessionId, row.id))
+    .all();
+  const knownCosts = jobs
+    .map((job) => job.costMicrousd)
+    .filter((cost): cost is number => cost !== null);
   return {
     id: row.id,
     title: row.title,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-    knownCostMicrousd: 0,
-    costComplete: true,
-    activeJobCount: 0,
+    knownCostMicrousd: knownCosts.reduce((total, cost) => total + cost, 0),
+    costComplete: jobs.every((job) => job.costComplete),
+    activeJobCount: jobs.filter(
+      (job) => job.status === "queued" || job.status === "running",
+    ).length,
   };
 }
 
 function detailFromRow(
+  database: AppDatabase,
   row: SessionRow,
   references: SessionDetail["references"] = [],
 ): SessionDetail {
   return {
-    ...summaryFromRow(row),
+    ...summaryFromRow(database, row),
     draft: JSON.parse(row.draftJson) as SessionDraft,
     references,
+    runs: database.orm
+      .select({ id: generationRuns.id })
+      .from(generationRuns)
+      .where(eq(generationRuns.sessionId, row.id))
+      .orderBy(desc(generationRuns.createdAt))
+      .all()
+      .flatMap((run) => {
+        const detail = runDetail(database, run.id);
+        return detail ? [detail] : [];
+      }),
   };
 }
 
@@ -117,7 +150,7 @@ export async function registerSessionRoutes(
         .where(eq(sessions.ownerId, resolveUser(request)))
         .orderBy(desc(sessions.updatedAt))
         .all()
-        .map(summaryFromRow),
+        .map((row) => summaryFromRow(database, row)),
   );
 
   app.post<{ Body: CreateSessionBody }>(
@@ -146,6 +179,7 @@ export async function registerSessionRoutes(
       database.orm.insert(sessions).values(row).run();
       reply.code(201);
       return detailFromRow(
+        database,
         row,
         assetService.listReferences(row.id, resolveUser(request)),
       );
@@ -180,6 +214,7 @@ export async function registerSessionRoutes(
       }
 
       return detailFromRow(
+        database,
         row,
         assetService.listReferences(row.id, resolveUser(request)),
       );
@@ -259,6 +294,7 @@ export async function registerSessionRoutes(
         .run();
 
       return detailFromRow(
+        database,
         updated,
         assetService.listReferences(updated.id, ownerId),
       );

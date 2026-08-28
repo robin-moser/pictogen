@@ -9,6 +9,7 @@ async function start() {
 
   try {
     app = await buildApp({ config, database });
+    app.generationWorker.start();
   } catch (error) {
     database.close();
     throw error;

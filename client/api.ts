@@ -1,5 +1,7 @@
 import type {
   Asset,
+  CreateRun,
+  GenerationRun,
   ModelCatalog,
   SessionDetail,
   SessionDraft,
@@ -108,4 +110,17 @@ export function deleteAsset(assetId: string) {
   return request<undefined>(`/api/assets/${encodeURIComponent(assetId)}`, {
     method: "DELETE",
   });
+}
+
+export function createRun(sessionId: string, run: CreateRun) {
+  return request<{ run: GenerationRun }>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/runs`,
+    {
+      ...jsonRequest("POST", run),
+      headers: {
+        "content-type": "application/json",
+        "idempotency-key": crypto.randomUUID(),
+      },
+    },
+  );
 }

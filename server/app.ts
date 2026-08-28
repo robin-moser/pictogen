@@ -17,6 +17,8 @@ import { createOpenRouterProvider } from "./providers/openrouter.js";
 import type { ImageProvider } from "./providers/types.js";
 import { createAssetService } from "./services/assets.js";
 import { createModelCatalog } from "./services/models.js";
+import { createGenerationWorker } from "./services/generation.js";
+import { registerGenerationRoutes } from "./routes/generation.js";
 
 type BuildAppOptions = {
   config: AppConfig;
@@ -128,13 +130,21 @@ export async function buildApp({
   );
 
   const assetService = createAssetService(config, database);
+  const imageProvider = provider ?? createOpenRouterProvider(config);
   const modelCatalog = createModelCatalog(
-    provider ?? createOpenRouterProvider(config),
+    imageProvider,
     config.modelCacheTtlSeconds,
+  );
+  const generationWorker = createGenerationWorker(
+    config,
+    database,
+    imageProvider,
+    assetService,
   );
   await registerSessionRoutes(app, database, assetService);
   registerAssetRoutes(app, database, assetService);
   registerModelRoutes(app, modelCatalog);
+  registerGenerationRoutes(app, database, imageProvider, generationWorker.wake);
 
   if (config.nodeEnv === "production") {
     await app.register(fastifyStatic, {
@@ -169,8 +179,9 @@ export async function buildApp({
   }
 
   app.addHook("onClose", () => {
+    generationWorker.stop();
     database.close();
   });
 
-  return app;
+  return Object.assign(app, { generationWorker });
 }

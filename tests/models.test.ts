@@ -18,7 +18,10 @@ describe("model catalog", () => {
                 input_modalities: ["text", "image"],
                 output_modalities: ["image"],
               },
-              supported_parameters: ["input_references"],
+              supported_parameters: {
+                input_references: { type: "boolean" },
+                resolution: { type: "enum", values: ["1K", "2K"] },
+              },
             },
             {
               id: "acme/text-only",
@@ -41,11 +44,15 @@ describe("model catalog", () => {
         name: "Image maker",
         description: "Produces image output.",
         inputModalities: ["text", "image"],
-        capabilities: { referenceImages: true },
+        capabilities: {
+          referenceImages: true,
+          resolutions: ["1K", "2K"],
+          aspectRatios: [],
+        },
       },
     ]);
     expect(fetchImplementation).toHaveBeenCalledWith(
-      "https://openrouter.ai/api/v1/models",
+      "https://openrouter.ai/api/v1/images/models",
       expect.objectContaining({
         headers: expect.objectContaining({ authorization: "Bearer test-key" }),
       }),
