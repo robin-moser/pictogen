@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "isolatedModules": false,
+    "rootDir": "server",
+    "outDir": "dist/server",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "sourceMap": false
+  },
+  "include": ["server/**/*.ts"]
+}

@@ -2,5 +2,15 @@
 work/
 data/
 
+# dependencies and generated output
+node_modules/
+dist/
+coverage/
+
+# environment
+.env
+.env.*
+!.env.example
+
 # general
 .DS_Store

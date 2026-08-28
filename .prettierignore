@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+data/
+work/
+.codegraph/
+.agents/
+AGENTS.md
+package-lock.json

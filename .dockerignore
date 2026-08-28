@@ -1,0 +1,12 @@
+.git
+.codegraph
+.agents
+node_modules
+dist
+coverage
+data
+work
+.env
+.env.*
+!.env.example
+*.log
