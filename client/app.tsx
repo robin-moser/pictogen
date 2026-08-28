@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 
 import {
+  cancelJob,
+  clearGenerationLog,
   createSession,
   createRun,
   deleteAsset,
   deleteSession,
+  dismissJob,
   getIdentity,
   getSession,
   listSessions,
@@ -63,6 +66,7 @@ export function App() {
   const [draft, setDraft] = useState<SessionDraft>(createEmptyDraft);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [busySessionId, setBusySessionId] = useState<string | null>(null);
+  const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,6 +77,7 @@ export function App() {
   const savePromiseRef = useRef<Promise<boolean> | null>(null);
   const sessionRequestRef = useRef(0);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const busyItemRef = useRef<string | null>(null);
 
   function updateSessionList(detail: SessionDetail) {
     const summary = summaryFromDetail(detail);
@@ -253,13 +258,35 @@ export function App() {
   useEffect(() => {
     if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     if (!activeSession || !activeSession.activeJobCount) return;
-    pollTimerRef.current = setTimeout(
-      () => {
-        void refreshSession(activeSession.id).catch(() => undefined);
-      },
-      document.hidden ? 8_000 : 2_000,
-    );
+    const sessionId = activeSession.id;
+    let stopped = false;
+
+    function schedulePoll() {
+      pollTimerRef.current = setTimeout(
+        async () => {
+          pollTimerRef.current = null;
+          let keepPolling = true;
+          try {
+            const detail = await refreshSession(sessionId);
+            keepPolling = detail.activeJobCount > 0;
+          } catch {
+            // A transient refresh failure should not strand an active placeholder.
+          }
+          if (
+            !stopped &&
+            keepPolling &&
+            activeSessionRef.current?.id === sessionId
+          ) {
+            schedulePoll();
+          }
+        },
+        document.hidden ? 8_000 : 2_000,
+      );
+    }
+
+    schedulePoll();
     return () => {
+      stopped = true;
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     };
   }, [activeSession?.id, activeSession?.activeJobCount]);
@@ -290,6 +317,78 @@ export function App() {
           : "The generation could not be submitted.",
       );
     }
+  }
+
+  async function mutateSessionItem(
+    itemId: string,
+    mutation: () => Promise<unknown>,
+    failureMessage: string,
+  ) {
+    const sessionId = activeSessionRef.current?.id;
+    if (!sessionId || busyItemRef.current) return;
+
+    busyItemRef.current = itemId;
+    setBusyItemId(itemId);
+    setError(null);
+    try {
+      try {
+        await mutation();
+      } catch (mutationError) {
+        setError(
+          mutationError instanceof Error
+            ? mutationError.message
+            : failureMessage,
+        );
+        return;
+      }
+
+      try {
+        if (activeSessionRef.current?.id === sessionId) {
+          await refreshSession(sessionId);
+        }
+      } catch {
+        setError(
+          "The change was saved, but the session could not be refreshed.",
+        );
+      }
+    } finally {
+      busyItemRef.current = null;
+      setBusyItemId(null);
+    }
+  }
+
+  function handleCancelJob(jobId: string) {
+    return mutateSessionItem(
+      jobId,
+      () => cancelJob(jobId),
+      "The job could not be cancelled.",
+    );
+  }
+
+  function handleDeleteOutput(assetId: string) {
+    return mutateSessionItem(
+      assetId,
+      () => deleteAsset(assetId),
+      "The image could not be deleted.",
+    );
+  }
+
+  function handleDismissJob(jobId: string) {
+    return mutateSessionItem(
+      jobId,
+      () => dismissJob(jobId),
+      "The log entry could not be removed.",
+    );
+  }
+
+  function handleClearGenerationLog() {
+    const sessionId = activeSessionRef.current?.id;
+    if (!sessionId) return;
+    return mutateSessionItem(
+      sessionId,
+      () => clearGenerationLog(sessionId),
+      "The generation log could not be cleared.",
+    );
   }
 
   async function handleCreate(title: string) {
@@ -527,6 +626,11 @@ export function App() {
           onReferenceUploaded={handleReferenceUploaded}
           onReferenceRemoved={handleReferenceRemoved}
           onGenerate={() => void handleGenerate()}
+          busyItemId={busyItemId}
+          onCancelJob={(jobId) => void handleCancelJob(jobId)}
+          onDeleteOutput={(assetId) => void handleDeleteOutput(assetId)}
+          onDismissJob={(jobId) => void handleDismissJob(jobId)}
+          onClearGenerationLog={() => void handleClearGenerationLog()}
         />
       </div>
 

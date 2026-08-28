@@ -155,21 +155,24 @@ export function registerAssetRoutes(
         .get();
       if (session) {
         const draft = JSON.parse(session.draftJson) as SessionDraft;
-        if (draft.referenceAssetIds.includes(asset.id)) {
-          database.orm
-            .update(sessions)
-            .set({
-              draftJson: JSON.stringify({
-                ...draft,
-                referenceAssetIds: draft.referenceAssetIds.filter(
-                  (assetId) => assetId !== asset.id,
-                ),
-              }),
-              updatedAt: new Date().toISOString(),
-            })
-            .where(eq(sessions.id, session.id))
-            .run();
-        }
+        const isSelectedReference = draft.referenceAssetIds.includes(asset.id);
+        database.orm
+          .update(sessions)
+          .set({
+            ...(isSelectedReference
+              ? {
+                  draftJson: JSON.stringify({
+                    ...draft,
+                    referenceAssetIds: draft.referenceAssetIds.filter(
+                      (assetId) => assetId !== asset.id,
+                    ),
+                  }),
+                }
+              : {}),
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(sessions.id, session.id))
+          .run();
       }
 
       await assetService.removeFile(asset.storagePath);

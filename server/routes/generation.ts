@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Type } from "@sinclair/typebox";
-import { and, eq, inArray, max } from "drizzle-orm";
+import { and, eq, inArray, isNull, max } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import {
   CreateRunSchema,
@@ -19,7 +19,8 @@ import {
 } from "../db/schema.js";
 import type { ImageProvider } from "../providers/types.js";
 
-const Params = Type.Object({ sessionId: Type.String({ minLength: 1 }) });
+const SessionParams = Type.Object({ sessionId: Type.String({ minLength: 1 }) });
+const JobParams = Type.Object({ jobId: Type.String({ minLength: 1 }) });
 export function registerGenerationRoutes(
   app: FastifyInstance,
   database: AppDatabase,
@@ -30,7 +31,7 @@ export function registerGenerationRoutes(
     "/api/sessions/:sessionId/runs",
     {
       schema: {
-        params: Params,
+        params: SessionParams,
         body: CreateRunSchema,
         response: {
           202: Type.Object({ run: GenerationRunSchema }),
@@ -153,32 +154,42 @@ export function registerGenerationRoutes(
             createdAt: now,
           })
           .run();
-        request.body.models.forEach((model, index) => {
-          const jobId = randomUUID();
-          const modelName = selectedModels[index]?.name;
+        request.body.models.forEach((model, modelIndex) => {
+          const modelName = selectedModels[modelIndex]?.name;
           if (!modelName) throw new Error("The selected model is unavailable.");
-          tx.insert(generationJobs)
-            .values({
-              id: jobId,
-              runId,
-              sessionId: session.id,
-              ownerId,
-              queueOrder: queueOrder + index,
-              providerId: model.providerId,
-              modelId: model.modelId,
-              modelName,
-              requestedCount: request.body.count,
-              completedCount: 0,
-              status: "queued",
-              usageJson: "[]",
-              costMicrousd: 0,
-              costComplete: true,
-              createdAt: now,
-            })
-            .run();
-          request.body.referenceAssetIds.forEach((assetId, ordinal) =>
-            tx.insert(jobReferences).values({ jobId, assetId, ordinal }).run(),
-          );
+          for (
+            let imageIndex = 0;
+            imageIndex < request.body.count;
+            imageIndex += 1
+          ) {
+            const jobId = randomUUID();
+            tx.insert(generationJobs)
+              .values({
+                id: jobId,
+                runId,
+                sessionId: session.id,
+                ownerId,
+                queueOrder:
+                  queueOrder + modelIndex * request.body.count + imageIndex,
+                providerId: model.providerId,
+                modelId: model.modelId,
+                modelName,
+                requestedCount: 1,
+                completedCount: 0,
+                status: "queued",
+                usageJson: "[]",
+                costMicrousd: 0,
+                costComplete: true,
+                createdAt: now,
+              })
+              .run();
+            request.body.referenceAssetIds.forEach((assetId, ordinal) =>
+              tx
+                .insert(jobReferences)
+                .values({ jobId, assetId, ordinal })
+                .run(),
+            );
+          }
         });
         tx.update(sessions)
           .set({ updatedAt: now })
@@ -188,6 +199,198 @@ export function registerGenerationRoutes(
       wake();
       reply.code(202);
       return { run: requiredRunDetail(database, runId) };
+    },
+  );
+
+  app.post<{ Params: { jobId: string } }>(
+    "/api/jobs/:jobId/cancel",
+    {
+      schema: {
+        params: JobParams,
+        response: {
+          204: Type.Null(),
+          404: ErrorResponseSchema,
+          409: ErrorResponseSchema,
+        },
+      },
+    },
+    (request, reply) => {
+      const ownerId = resolveUser(request);
+      const job = database.orm
+        .select({ status: generationJobs.status })
+        .from(generationJobs)
+        .where(
+          and(
+            eq(generationJobs.id, request.params.jobId),
+            eq(generationJobs.ownerId, ownerId),
+          ),
+        )
+        .get();
+
+      if (!job) {
+        return reply.code(404).send({
+          error: { code: "JOB_NOT_FOUND", message: "Job not found." },
+        });
+      }
+
+      if (job.status !== "queued") {
+        return reply.code(409).send({
+          error: {
+            code: "JOB_NOT_CANCELLABLE",
+            message: "Only queued jobs can be cancelled.",
+          },
+        });
+      }
+
+      const cancelled = database.orm
+        .update(generationJobs)
+        .set({ status: "cancelled", finishedAt: new Date().toISOString() })
+        .where(
+          and(
+            eq(generationJobs.id, request.params.jobId),
+            eq(generationJobs.ownerId, ownerId),
+            eq(generationJobs.status, "queued"),
+          ),
+        )
+        .run();
+
+      if (!cancelled.changes) {
+        return reply.code(409).send({
+          error: {
+            code: "JOB_NOT_CANCELLABLE",
+            message: "Only queued jobs can be cancelled.",
+          },
+        });
+      }
+
+      return reply.code(204).send(null);
+    },
+  );
+
+  app.delete<{ Params: { jobId: string } }>(
+    "/api/jobs/:jobId",
+    {
+      schema: {
+        params: JobParams,
+        response: {
+          204: Type.Null(),
+          404: ErrorResponseSchema,
+          409: ErrorResponseSchema,
+        },
+      },
+    },
+    (request, reply) => {
+      const ownerId = resolveUser(request);
+      const job = database.orm
+        .select({
+          id: generationJobs.id,
+          sessionId: generationJobs.sessionId,
+          status: generationJobs.status,
+        })
+        .from(generationJobs)
+        .where(
+          and(
+            eq(generationJobs.id, request.params.jobId),
+            eq(generationJobs.ownerId, ownerId),
+            isNull(generationJobs.hiddenAt),
+          ),
+        )
+        .get();
+
+      if (!job) {
+        return reply.code(404).send({
+          error: { code: "JOB_NOT_FOUND", message: "Job not found." },
+        });
+      }
+
+      if (job.status !== "failed" && job.status !== "partial") {
+        return reply.code(409).send({
+          error: {
+            code: "JOB_NOT_DISMISSIBLE",
+            message: "Only failed jobs can be removed from the generation log.",
+          },
+        });
+      }
+
+      const hiddenAt = new Date().toISOString();
+      database.orm
+        .update(generationJobs)
+        .set({ hiddenAt })
+        .where(
+          and(
+            eq(generationJobs.id, job.id),
+            eq(generationJobs.ownerId, ownerId),
+            isNull(generationJobs.hiddenAt),
+          ),
+        )
+        .run();
+      database.orm
+        .update(sessions)
+        .set({ updatedAt: hiddenAt })
+        .where(
+          and(eq(sessions.id, job.sessionId), eq(sessions.ownerId, ownerId)),
+        )
+        .run();
+
+      return reply.code(204).send(null);
+    },
+  );
+
+  app.delete<{ Params: { sessionId: string } }>(
+    "/api/sessions/:sessionId/generation-log",
+    {
+      schema: {
+        params: SessionParams,
+        response: {
+          204: Type.Null(),
+          404: ErrorResponseSchema,
+        },
+      },
+    },
+    (request, reply) => {
+      const ownerId = resolveUser(request);
+      const session = database.orm
+        .select({ id: sessions.id })
+        .from(sessions)
+        .where(
+          and(
+            eq(sessions.id, request.params.sessionId),
+            eq(sessions.ownerId, ownerId),
+          ),
+        )
+        .get();
+
+      if (!session) {
+        return reply.code(404).send({
+          error: { code: "SESSION_NOT_FOUND", message: "Session not found." },
+        });
+      }
+
+      const hiddenAt = new Date().toISOString();
+      const hidden = database.orm
+        .update(generationJobs)
+        .set({ hiddenAt })
+        .where(
+          and(
+            eq(generationJobs.sessionId, session.id),
+            eq(generationJobs.ownerId, ownerId),
+            inArray(generationJobs.status, ["failed", "partial"]),
+            isNull(generationJobs.hiddenAt),
+          ),
+        )
+        .run();
+
+      if (hidden.changes) {
+        database.orm
+          .update(sessions)
+          .set({ updatedAt: hiddenAt })
+          .where(
+            and(eq(sessions.id, session.id), eq(sessions.ownerId, ownerId)),
+          )
+          .run();
+      }
+
+      return reply.code(204).send(null);
     },
   );
 }
@@ -201,7 +404,10 @@ export function runDetail(database: AppDatabase, runId: string) {
   const jobs = database.orm
     .select()
     .from(generationJobs)
-    .where(eq(generationJobs.runId, runId))
+    .where(
+      and(eq(generationJobs.runId, runId), isNull(generationJobs.hiddenAt)),
+    )
+    .orderBy(generationJobs.queueOrder)
     .all()
     .map((job) => ({
       id: job.id,

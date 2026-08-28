@@ -108,6 +108,7 @@ export const generationJobs = sqliteTable(
     costComplete: integer("cost_complete", { mode: "boolean" }).notNull(),
     errorCode: text("error_code"),
     errorMessage: text("error_message"),
+    hiddenAt: text("hidden_at"),
     startedAt: text("started_at"),
     finishedAt: text("finished_at"),
     createdAt: text("created_at").notNull(),

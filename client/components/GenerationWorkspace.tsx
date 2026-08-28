@@ -22,6 +22,11 @@ type Props = {
   onReferenceUploaded: (asset: Asset) => void;
   onReferenceRemoved: (assetId: string) => Promise<boolean>;
   onGenerate: () => void;
+  busyItemId: string | null;
+  onCancelJob: (jobId: string) => void;
+  onDeleteOutput: (assetId: string) => void;
+  onDismissJob: (jobId: string) => void;
+  onClearGenerationLog: () => void;
 };
 const saveLabels: Record<SaveStatus, string> = {
   saved: "Saved",
@@ -40,6 +45,11 @@ export function GenerationWorkspace({
   onReferenceUploaded,
   onReferenceRemoved,
   onGenerate,
+  busyItemId,
+  onCancelJob,
+  onDeleteOutput,
+  onDismissJob,
+  onClearGenerationLog,
 }: Props) {
   const [models, setModels] = useState<ImageModel[]>([]);
   const [modelSearch, setModelSearch] = useState("");
@@ -145,7 +155,14 @@ export function GenerationWorkspace({
                 onGenerate={onGenerate}
               />
             </div>
-            <OutputSection session={session} />
+            <OutputSection
+              session={session}
+              busyItemId={busyItemId}
+              onCancelJob={onCancelJob}
+              onDeleteOutput={onDeleteOutput}
+              onDismissJob={onDismissJob}
+              onClearGenerationLog={onClearGenerationLog}
+            />
           </div>
           <SettingsSidebar
             draft={draft}

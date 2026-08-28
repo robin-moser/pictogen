@@ -37,6 +37,8 @@ export function createGenerationWorker(
       .where(eq(generationJobs.id, jobId))
       .get();
     if (!job) return;
+    let returnedCost: number | null = null;
+    let returnedUsage = "{}";
     try {
       if (!provider.generateImages)
         throw new Error("The configured provider cannot generate images.");
@@ -71,33 +73,40 @@ export function createGenerationWorker(
         aspectRatio: options.aspectRatio,
         references: referenceBytes,
       });
-      let completed = job.completedCount;
-      for (const image of result.images) {
-        await assetService.createOutput(
-          job.sessionId,
-          job.ownerId,
-          job.id,
-          completed,
-          image,
-        );
-        completed += 1;
+      returnedCost = costToMicrousd(result.usage?.cost);
+      returnedUsage = JSON.stringify(result.usage ?? {});
+      const image = result.images[0];
+      if (!image) {
+        database.orm
+          .update(generationJobs)
+          .set({
+            status: "failed",
+            usageJson: returnedUsage,
+            costMicrousd: returnedCost,
+            costComplete: returnedCost !== null,
+            errorMessage: "The provider returned no image.",
+            finishedAt: new Date().toISOString(),
+          })
+          .where(eq(generationJobs.id, job.id))
+          .run();
+        return;
       }
-      const cost = costToMicrousd(result.usage?.cost);
+      await assetService.createOutput(
+        job.sessionId,
+        job.ownerId,
+        job.id,
+        0,
+        image,
+      );
       database.orm
         .update(generationJobs)
         .set({
-          completedCount: completed,
-          status: completed === job.requestedCount ? "succeeded" : "partial",
-          usageJson: JSON.stringify(result.usage ?? {}),
-          costMicrousd: cost,
-          costComplete: cost !== null,
+          completedCount: 1,
+          status: "succeeded",
+          usageJson: returnedUsage,
+          costMicrousd: returnedCost,
+          costComplete: returnedCost !== null,
           finishedAt: new Date().toISOString(),
-          ...(completed === job.requestedCount
-            ? {}
-            : {
-                errorMessage:
-                  "The provider returned fewer images than requested.",
-              }),
         })
         .where(eq(generationJobs.id, job.id))
         .run();
@@ -112,7 +121,9 @@ export function createGenerationWorker(
           .update(generationJobs)
           .set({
             status: current.completedCount ? "partial" : "failed",
-            costComplete: false,
+            costMicrousd: returnedCost,
+            costComplete: returnedCost !== null,
+            usageJson: returnedUsage,
             errorMessage:
               error instanceof Error ? error.message : "Generation failed.",
             finishedAt: new Date().toISOString(),

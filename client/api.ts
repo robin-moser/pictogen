@@ -124,3 +124,22 @@ export function createRun(sessionId: string, run: CreateRun) {
     },
   );
 }
+
+export function cancelJob(jobId: string) {
+  return request<undefined>(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, {
+    method: "POST",
+  });
+}
+
+export function dismissJob(jobId: string) {
+  return request<undefined>(`/api/jobs/${encodeURIComponent(jobId)}`, {
+    method: "DELETE",
+  });
+}
+
+export function clearGenerationLog(sessionId: string) {
+  return request<undefined>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/generation-log`,
+    { method: "DELETE" },
+  );
+}

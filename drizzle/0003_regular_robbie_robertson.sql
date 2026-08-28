@@ -1,0 +1,1 @@
+ALTER TABLE `generation_jobs` ADD `hidden_at` text;
