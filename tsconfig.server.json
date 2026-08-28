@@ -3,11 +3,11 @@
   "compilerOptions": {
     "noEmit": false,
     "isolatedModules": false,
-    "rootDir": "server",
-    "outDir": "dist/server",
+    "rootDir": ".",
+    "outDir": "dist",
     "lib": ["ES2023"],
     "types": ["node"],
     "sourceMap": false
   },
-  "include": ["server/**/*.ts"]
+  "include": ["server/**/*.ts", "shared/**/*.ts"]
 }

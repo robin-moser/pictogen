@@ -5,6 +5,8 @@ import BetterSqlite3 from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 
+import * as schema from "./db/schema.js";
+
 export type AppDatabase = ReturnType<typeof openDatabase>;
 
 type OpenDatabaseOptions = {
@@ -32,6 +34,7 @@ export function openDatabase({
 
   return {
     sqlite,
+    orm: drizzle(sqlite, { schema }),
     isHealthy() {
       try {
         return sqlite.prepare("select 1 as healthy").pluck().get() === 1;

@@ -9,6 +9,7 @@ import Fastify from "fastify";
 
 import type { AppConfig } from "./config.js";
 import type { AppDatabase } from "./db.js";
+import { registerSessionRoutes } from "./routes/sessions.js";
 
 type BuildAppOptions = {
   config: AppConfig;
@@ -25,6 +26,30 @@ export async function buildApp({ config, database }: BuildAppOptions) {
   }).withTypeProvider<TypeBoxTypeProvider>();
 
   app.setValidatorCompiler(TypeBoxValidatorCompiler);
+
+  app.setErrorHandler((error, request, reply) => {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "validation" in error &&
+      error.validation
+    ) {
+      return reply.code(400).send({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "The request did not match the expected format.",
+        },
+      });
+    }
+
+    request.log.error(error);
+    return reply.code(500).send({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An unexpected error occurred.",
+      },
+    });
+  });
 
   await app.register(helmet, {
     contentSecurityPolicy: {
@@ -43,6 +68,27 @@ export async function buildApp({ config, database }: BuildAppOptions) {
     },
     crossOriginResourcePolicy: { policy: "same-origin" },
     referrerPolicy: { policy: "no-referrer" },
+  });
+
+  app.addHook("onRequest", (request, reply, done) => {
+    if (!["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) {
+      done();
+      return;
+    }
+
+    const origin = request.headers.origin;
+
+    if (origin && origin !== config.publicUrl.origin) {
+      void reply.code(403).send({
+        error: {
+          code: "ORIGIN_NOT_ALLOWED",
+          message: "Cross-origin requests are not allowed.",
+        },
+      });
+      return;
+    }
+
+    done();
   });
 
   app.get(
@@ -64,6 +110,8 @@ export async function buildApp({ config, database }: BuildAppOptions) {
       return { status: "ok" } as const;
     },
   );
+
+  await registerSessionRoutes(app, database);
 
   if (config.nodeEnv === "production") {
     await app.register(fastifyStatic, {

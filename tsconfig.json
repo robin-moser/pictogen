@@ -21,6 +21,7 @@
     "client/**/*.ts",
     "client/**/*.tsx",
     "server/**/*.ts",
+    "shared/**/*.ts",
     "tests/**/*.ts",
     "*.config.ts"
   ]
