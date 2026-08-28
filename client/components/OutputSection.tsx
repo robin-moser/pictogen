@@ -9,6 +9,7 @@ type Output = Job["outputs"][number];
 
 type Props = {
   session: SessionDetail;
+  columns: number;
   busyItemId: string | null;
   onCancelJob: (jobId: string) => void;
   onDeleteOutput: (assetId: string) => void;
@@ -18,6 +19,7 @@ type Props = {
 
 export function OutputSection({
   session,
+  columns,
   busyItemId,
   onCancelJob,
   onDeleteOutput,
@@ -74,7 +76,8 @@ export function OutputSection({
     const small = window.matchMedia("(min-width: 40rem)");
     const large = window.matchMedia("(min-width: 64rem)");
     const grid = new MasonryGrid(element, {
-      align: "start",
+      align: "stretch",
+      column: columns,
       gap: large.matches ? 16 : 8,
       useResizeObserver: true,
       observeChildren: true,
@@ -93,7 +96,7 @@ export function OutputSection({
       large.removeEventListener("change", updateLayout);
       grid.destroy();
     };
-  }, [galleryKey]);
+  }, [columns, galleryKey]);
 
   useEffect(() => {
     if (!lightboxImage) return;
@@ -288,12 +291,12 @@ function GalleryItem({
 
   return (
     <figure
-      class="group bg-base-300 relative w-[calc(50%_-_0.25rem)] overflow-hidden rounded-box outline-offset-2 focus-within:outline-2 focus-within:outline-primary sm:w-[calc(33.333333%_-_0.333333rem)] lg:w-[calc(25%_-_0.75rem)]"
+      class="group bg-base-300 relative overflow-hidden rounded-box outline-offset-2 focus-within:outline-2 focus-within:outline-primary"
       style={output ? undefined : { aspectRatio }}
     >
       {output ? (
         <button
-          class="block w-full cursor-zoom-in text-left"
+          class="block w-full cursor-pointer text-left"
           type="button"
           onClick={(event) => {
             if (

@@ -55,6 +55,7 @@ export function GenerationWorkspace({
   const [modelSearch, setModelSearch] = useState("");
   const [modelError, setModelError] = useState<string | null>(null);
   const [catalogStale, setCatalogStale] = useState(false);
+  const [galleryColumns, setGalleryColumns] = useState(3);
   useEffect(() => {
     if (!session) return;
     const controller = new AbortController();
@@ -121,6 +122,25 @@ export function GenerationWorkspace({
           </h1>
         </div>
         <div class="flex shrink-0 items-center gap-3">
+          <label class="flex items-center gap-2 text-xs font-medium text-base-content/60">
+            Images per line
+            <select
+              class="select select-sm w-16 font-normal text-base-content"
+              value={galleryColumns}
+              onChange={(event) =>
+                setGalleryColumns(Number(event.currentTarget.value))
+              }
+              aria-label="Images per line"
+            >
+              {Array.from({ length: 6 }, (_, index) => index + 1).map(
+                (columns) => (
+                  <option key={columns} value={columns}>
+                    {columns}
+                  </option>
+                ),
+              )}
+            </select>
+          </label>
           <span
             class={`text-xs font-medium ${saveStatus === "error" ? "text-error" : "text-base-content/50"}`}
             role="status"
@@ -157,6 +177,7 @@ export function GenerationWorkspace({
             </div>
             <OutputSection
               session={session}
+              columns={galleryColumns}
               busyItemId={busyItemId}
               onCancelJob={onCancelJob}
               onDeleteOutput={onDeleteOutput}
