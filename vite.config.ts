@@ -28,6 +28,7 @@ export default defineConfig(({ mode }) => {
       outDir: "dist/client",
     },
     server: {
+      allowedHosts: ["host.docker.internal"],
       proxy: {
         "/api": {
           target: backendTarget,

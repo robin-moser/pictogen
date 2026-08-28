@@ -52,8 +52,8 @@ export function SessionSidebar({
   }
 
   return (
-    <aside class="border-base-300 bg-base-100 flex min-h-full w-[19rem] flex-col border-r">
-      <div class="border-base-300 border-b px-5 py-5">
+    <aside class="border-base-300 bg-base-300 flex min-h-full w-[19rem] flex-col border-r">
+      <div class="border-base-300 bg-base-200 border-b px-5 py-5">
         <div class="flex items-center justify-between gap-3">
           <a class="group flex items-center gap-3" href="/">
             <span
@@ -140,7 +140,7 @@ export function SessionSidebar({
                 <li key={session.id}>
                   {editing ? (
                     <form
-                      class="border-base-300 bg-base-200 rounded-field border p-2"
+                      class="border-base-300 bg-base-100 rounded-field border p-2 shadow-sm"
                       onSubmit={(event) => submitRename(event, session.id)}
                     >
                       <input
@@ -170,7 +170,7 @@ export function SessionSidebar({
                     <div
                       class={`group/session relative rounded-field border-l-2 p-0 ${
                         active
-                          ? "border-primary bg-base-200"
+                          ? "border-primary bg-base-100 shadow-sm"
                           : "border-transparent"
                       }`}
                     >
@@ -235,7 +235,7 @@ export function SessionSidebar({
         )}
       </nav>
 
-      <div class="border-base-300 text-base-content/55 border-t px-5 py-3 text-xs">
+      <div class="border-base-300 bg-base-200 text-base-content/55 border-t px-5 py-3 text-xs">
         Workspace for <span class="text-base-content font-medium">{user}</span>
       </div>
     </aside>
