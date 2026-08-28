@@ -1,54 +1,110 @@
 import type { SessionDetail } from "../../shared/contracts.js";
+import { useState } from "preact/hooks";
+
 export function OutputSection({ session }: { session: SessionDetail }) {
+  const [lightboxId, setLightboxId] = useState<string | null>(null);
   if (!session.runs.length) return null;
+
+  const outputs = session.runs.flatMap((run) =>
+    run.jobs
+      .filter((job) => job.status !== "failed")
+      .flatMap((job) =>
+        Array.from({ length: job.requestedCount }, (_, index) => ({
+          output: job.outputs[index],
+          job,
+          options: run.options,
+        })),
+      ),
+  );
+
+  const lightboxImage = outputs.find(({ output }) => output?.id === lightboxId);
+
   return (
     <section class="py-5">
       <div class="mx-auto max-w-6xl">
-        <div class="mt-4 grid gap-5">
-          {session.runs.map((run) => (
-            <article
-              key={run.id}
-              class="border-base-300 rounded-box border bg-base-100 p-4 shadow-sm"
+        <div class="columns-2 gap-2 sm:columns-3 lg:columns-4">
+          {outputs.map(({ output, job, options }, index) => (
+            <figure
+              key={output?.id ?? `${job.id}-placeholder-${index}`}
+              class="group bg-base-300 relative mb-2 w-full break-inside-avoid overflow-hidden outline-offset-2 focus-within:outline-2 focus-within:outline-primary"
+              style={{ aspectRatio: options.aspectRatio.replace(":", " / ") }}
             >
-              <p class="text-base-content/60 text-sm whitespace-pre-wrap">
-                {run.prompt}
-              </p>
-              <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {run.jobs.map((job) => (
-                  <section key={job.id} class="bg-base-200/40 p-3">
-                    <div class="flex justify-between gap-2 text-sm">
-                      <strong>{job.modelName}</strong>
-                      <span>{job.status}</span>
-                    </div>
-                    {job.errorMessage && (
-                      <p class="text-error mt-2 text-xs">{job.errorMessage}</p>
-                    )}
-                    {job.outputs.length > 0 && (
-                      <div class="mt-3 grid grid-cols-2 gap-2">
-                        {job.outputs.map((output, index) => (
-                          <img
-                            key={output.id}
-                            class="bg-base-300 aspect-square w-full object-cover"
-                            loading="lazy"
-                            src={`/api/assets/${encodeURIComponent(output.id)}`}
-                            alt={`Generated image ${index + 1} for ${job.modelName}`}
-                          />
-                        ))}
-                      </div>
-                    )}
-                    {(job.status === "queued" || job.status === "running") && (
-                      <p class="text-base-content/60 mt-3 text-xs">
-                        {job.completedCount} / {job.requestedCount} images
-                        complete
-                      </p>
-                    )}
-                  </section>
-                ))}
-              </div>
-            </article>
+              {output ? (
+                <button
+                  class="block h-full w-full cursor-zoom-in text-left"
+                  type="button"
+                  onClick={() => setLightboxId(output.id)}
+                  aria-label={`Open generated image for ${job.modelName}`}
+                >
+                  <img
+                    class="h-full w-full object-contain transition duration-300 group-hover:scale-105"
+                    loading="lazy"
+                    src={`/api/assets/${encodeURIComponent(output.id)}`}
+                    alt={`Generated image for ${job.modelName}`}
+                  />
+                  <Metadata job={job} options={options} />
+                </button>
+              ) : (
+                <div class="flex h-full items-center justify-center">
+                  <span class="loading loading-spinner text-base-content/40" />
+                  <Metadata job={job} options={options} />
+                </div>
+              )}
+            </figure>
           ))}
         </div>
       </div>
+      {lightboxImage?.output && (
+        <dialog
+          open
+          class="modal modal-open bg-black/80 p-4"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setLightboxId(null);
+          }}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setLightboxId(null);
+          }}
+        >
+          <div class="relative flex h-[90vh] w-[95vw] items-center justify-center">
+            <img
+              class="max-h-full max-w-full object-contain"
+              src={`/api/assets/${encodeURIComponent(lightboxImage.output.id)}`}
+              alt={`Expanded generated image for ${lightboxImage.job.modelName}`}
+            />
+            <button
+              class="btn btn-circle btn-sm absolute top-2 right-2"
+              type="button"
+              onClick={() => setLightboxId(null)}
+              aria-label="Close image"
+            >
+              ×
+            </button>
+          </div>
+        </dialog>
+      )}
     </section>
+  );
+}
+
+function Metadata({
+  job,
+  options,
+}: {
+  job: SessionDetail["runs"][number]["jobs"][number];
+  options: SessionDetail["runs"][number]["options"];
+}) {
+  return (
+    <div class="pointer-events-none absolute inset-0 flex items-end bg-gradient-to-t from-black/85 via-black/25 to-transparent p-3 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">
+      <div class="flex flex-wrap gap-1.5 text-xs font-medium text-white">
+        <span class="rounded bg-black/75 px-2 py-1">{job.modelName}</span>
+        <span class="rounded bg-black/75 px-2 py-1">{options.resolution}</span>
+        <span class="rounded bg-black/75 px-2 py-1">{options.aspectRatio}</span>
+        <span class="rounded bg-black/75 px-2 py-1">
+          {job.costMicrousd === null
+            ? "Cost pending"
+            : `~$${(job.costMicrousd / 1_000_000).toFixed(2)}`}
+        </span>
+      </div>
+    </div>
   );
 }

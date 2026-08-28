@@ -269,7 +269,7 @@ export function App() {
     if (!session || !(await flushDraft())) return;
     try {
       setError(null);
-      await createRun(session.id, {
+      const { run } = await createRun(session.id, {
         prompt: draftRef.current.prompt,
         models: draftRef.current.models,
         count: draftRef.current.count,
@@ -279,6 +279,9 @@ export function App() {
         },
         referenceAssetIds: draftRef.current.referenceAssetIds,
       });
+      const queuedSession = { ...session, runs: [run, ...session.runs] };
+      activeSessionRef.current = queuedSession;
+      setActiveSession(queuedSession);
       await refreshSession(session.id);
     } catch (generationError) {
       setError(
