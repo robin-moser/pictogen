@@ -122,25 +122,30 @@ export function GenerationWorkspace({
           </h1>
         </div>
         <div class="flex shrink-0 items-center gap-3">
-          <label class="flex items-center gap-2 text-xs font-medium text-base-content/60">
-            Images per line
-            <select
-              class="select select-sm w-16 font-normal text-base-content"
+          <div class="mr-4 w-32 text-xs font-medium text-base-content/60 sm:w-40">
+            <label class="block text-center" for="gallery-columns">
+              Images per line
+            </label>
+            <input
+              id="gallery-columns"
+              class="range range-xs mt-1"
+              type="range"
+              min="1"
+              max="6"
+              step="1"
               value={galleryColumns}
-              onChange={(event) =>
+              onInput={(event) =>
                 setGalleryColumns(Number(event.currentTarget.value))
               }
-              aria-label="Images per line"
-            >
+            />
+            <div class="mt-1 flex justify-between px-1 text-[0.6rem]">
               {Array.from({ length: 6 }, (_, index) => index + 1).map(
                 (columns) => (
-                  <option key={columns} value={columns}>
-                    {columns}
-                  </option>
+                  <span key={columns}>{columns}</span>
                 ),
               )}
-            </select>
-          </label>
+            </div>
+          </div>
           <span
             class={`text-xs font-medium ${saveStatus === "error" ? "text-error" : "text-base-content/50"}`}
             role="status"
