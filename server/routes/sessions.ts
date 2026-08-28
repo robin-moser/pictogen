@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { Type } from "@sinclair/typebox";
 import type { Static } from "@sinclair/typebox";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
 import {
@@ -20,6 +20,8 @@ import type {
 import { resolveUser } from "../auth.js";
 import type { AppDatabase } from "../db.js";
 import { sessions } from "../db/schema.js";
+import { assets } from "../db/schema.js";
+import type { createAssetService } from "../services/assets.js";
 
 const SessionParamsSchema = Type.Object({
   sessionId: Type.String({ minLength: 1 }),
@@ -59,10 +61,14 @@ function summaryFromRow(row: SessionRow): SessionSummary {
   };
 }
 
-function detailFromRow(row: SessionRow): SessionDetail {
+function detailFromRow(
+  row: SessionRow,
+  references: SessionDetail["references"] = [],
+): SessionDetail {
   return {
     ...summaryFromRow(row),
     draft: JSON.parse(row.draftJson) as SessionDraft,
+    references,
   };
 }
 
@@ -81,6 +87,7 @@ function findOwnedSession(
 export async function registerSessionRoutes(
   app: FastifyInstance,
   database: AppDatabase,
+  assetService: ReturnType<typeof createAssetService>,
 ) {
   app.get(
     "/api/me",
@@ -138,7 +145,10 @@ export async function registerSessionRoutes(
 
       database.orm.insert(sessions).values(row).run();
       reply.code(201);
-      return detailFromRow(row);
+      return detailFromRow(
+        row,
+        assetService.listReferences(row.id, resolveUser(request)),
+      );
     },
   );
 
@@ -169,7 +179,10 @@ export async function registerSessionRoutes(
         });
       }
 
-      return detailFromRow(row);
+      return detailFromRow(
+        row,
+        assetService.listReferences(row.id, resolveUser(request)),
+      );
     },
   );
 
@@ -187,7 +200,7 @@ export async function registerSessionRoutes(
         },
       },
     },
-    (request, reply) => {
+    async (request, reply) => {
       const ownerId = resolveUser(request);
       const current = findOwnedSession(
         database,
@@ -202,6 +215,28 @@ export async function registerSessionRoutes(
             message: "Session not found.",
           },
         });
+      }
+
+      if (request.body.draft?.referenceAssetIds.length) {
+        const references = database.orm
+          .select({ id: assets.id })
+          .from(assets)
+          .where(
+            and(
+              eq(assets.ownerId, ownerId),
+              eq(assets.sessionId, current.id),
+              inArray(assets.id, request.body.draft.referenceAssetIds),
+            ),
+          )
+          .all();
+        if (references.length !== request.body.draft.referenceAssetIds.length) {
+          return reply.code(400).send({
+            error: {
+              code: "ASSET_INVALID",
+              message: "One or more reference images are unavailable.",
+            },
+          });
+        }
       }
 
       const updated: SessionRow = {
@@ -223,7 +258,10 @@ export async function registerSessionRoutes(
         .where(and(eq(sessions.id, current.id), eq(sessions.ownerId, ownerId)))
         .run();
 
-      return detailFromRow(updated);
+      return detailFromRow(
+        updated,
+        assetService.listReferences(updated.id, ownerId),
+      );
     },
   );
 
@@ -238,7 +276,7 @@ export async function registerSessionRoutes(
         },
       },
     },
-    (request, reply) => {
+    async (request, reply) => {
       const ownerId = resolveUser(request);
       const row = findOwnedSession(database, request.params.sessionId, ownerId);
 
@@ -251,10 +289,21 @@ export async function registerSessionRoutes(
         });
       }
 
+      const sessionAssets = database.orm
+        .select({ storagePath: assets.storagePath })
+        .from(assets)
+        .where(and(eq(assets.sessionId, row.id), eq(assets.ownerId, ownerId)))
+        .all();
+
       database.orm
         .delete(sessions)
         .where(and(eq(sessions.id, row.id), eq(sessions.ownerId, ownerId)))
         .run();
+      await Promise.all(
+        sessionAssets.map((asset) =>
+          assetService.removeFile(asset.storagePath),
+        ),
+      );
       return reply.code(204).send(null);
     },
   );

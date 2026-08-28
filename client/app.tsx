@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 
 import {
   createSession,
+  deleteAsset,
   deleteSession,
   getIdentity,
   getSession,
@@ -14,6 +15,7 @@ import type {
   SessionDetail,
   SessionDraft,
   SessionSummary,
+  Asset,
 } from "../shared/contracts.js";
 import { createEmptyDraft } from "../shared/contracts.js";
 
@@ -354,6 +356,60 @@ export function App() {
     }
   }
 
+  function handleReferenceUploaded(asset: Asset) {
+    const current = activeSessionRef.current;
+    if (!current || current.id !== asset.sessionId) {
+      return;
+    }
+
+    const nextDraft = {
+      ...draftRef.current,
+      referenceAssetIds: [...draftRef.current.referenceAssetIds, asset.id],
+    };
+    const detail = {
+      ...current,
+      references: [...current.references, asset],
+      draft: nextDraft,
+    };
+    activeSessionRef.current = detail;
+    setActiveSession(detail);
+    changeDraft(nextDraft);
+  }
+
+  async function handleReferenceRemoved(assetId: string) {
+    try {
+      setError(null);
+      await deleteAsset(assetId);
+      const current = activeSessionRef.current;
+      if (!current) {
+        return true;
+      }
+
+      const nextDraft = {
+        ...draftRef.current,
+        referenceAssetIds: draftRef.current.referenceAssetIds.filter(
+          (referenceId) => referenceId !== assetId,
+        ),
+      };
+      const detail = {
+        ...current,
+        references: current.references.filter((asset) => asset.id !== assetId),
+        draft: nextDraft,
+      };
+      activeSessionRef.current = detail;
+      setActiveSession(detail);
+      changeDraft(nextDraft);
+      return true;
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "The reference could not be removed.",
+      );
+      return false;
+    }
+  }
+
   const status = {
     checking: { label: "Connecting", indicator: "status-neutral" },
     connected: { label: "Connected", indicator: "status-success" },
@@ -413,6 +469,8 @@ export function App() {
           onDraftChange={changeDraft}
           onClose={() => void handleClose()}
           onCreate={() => void handleCreate("Untitled session")}
+          onReferenceUploaded={handleReferenceUploaded}
+          onReferenceRemoved={handleReferenceRemoved}
         />
       </div>
 

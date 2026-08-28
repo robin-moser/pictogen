@@ -1,4 +1,6 @@
 import type {
+  Asset,
+  ModelCatalog,
   SessionDetail,
   SessionDraft,
   SessionSummary,
@@ -87,6 +89,23 @@ export function updateSession(
 
 export function deleteSession(sessionId: string) {
   return request<undefined>(`/api/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE",
+  });
+}
+
+export function listModels(signal?: AbortSignal) {
+  return request<ModelCatalog>("/api/models", { signal: signal ?? null });
+}
+
+export function uploadReference(sessionId: string, file: File) {
+  const data = new FormData();
+  data.append("sessionId", sessionId);
+  data.append("file", file);
+  return request<Asset>("/api/assets", { method: "POST", body: data });
+}
+
+export function deleteAsset(assetId: string) {
+  return request<undefined>(`/api/assets/${encodeURIComponent(assetId)}`, {
     method: "DELETE",
   });
 }

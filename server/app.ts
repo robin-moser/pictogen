@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 
 import helmet from "@fastify/helmet";
 import fastifyStatic from "@fastify/static";
+import multipart from "@fastify/multipart";
 import { TypeBoxValidatorCompiler } from "@fastify/type-provider-typebox";
 import type { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import { Type } from "@sinclair/typebox";
@@ -10,22 +11,37 @@ import Fastify from "fastify";
 import type { AppConfig } from "./config.js";
 import type { AppDatabase } from "./db.js";
 import { registerSessionRoutes } from "./routes/sessions.js";
+import { registerAssetRoutes } from "./routes/assets.js";
+import { registerModelRoutes } from "./routes/models.js";
+import { createOpenRouterProvider } from "./providers/openrouter.js";
+import type { ImageProvider } from "./providers/types.js";
+import { createAssetService } from "./services/assets.js";
+import { createModelCatalog } from "./services/models.js";
 
 type BuildAppOptions = {
   config: AppConfig;
   database: AppDatabase;
+  provider?: ImageProvider;
 };
 
 const HealthResponse = Type.Object({
   status: Type.Union([Type.Literal("ok"), Type.Literal("unhealthy")]),
 });
 
-export async function buildApp({ config, database }: BuildAppOptions) {
+export async function buildApp({
+  config,
+  database,
+  provider,
+}: BuildAppOptions) {
   const app = Fastify({
     logger: config.nodeEnv !== "test",
   }).withTypeProvider<TypeBoxTypeProvider>();
 
   app.setValidatorCompiler(TypeBoxValidatorCompiler);
+
+  await app.register(multipart, {
+    limits: { files: 1, fileSize: config.maxUploadBytes },
+  });
 
   app.setErrorHandler((error, request, reply) => {
     if (
@@ -111,7 +127,14 @@ export async function buildApp({ config, database }: BuildAppOptions) {
     },
   );
 
-  await registerSessionRoutes(app, database);
+  const assetService = createAssetService(config, database);
+  const modelCatalog = createModelCatalog(
+    provider ?? createOpenRouterProvider(config),
+    config.modelCacheTtlSeconds,
+  );
+  await registerSessionRoutes(app, database, assetService);
+  registerAssetRoutes(app, database, assetService);
+  registerModelRoutes(app, modelCatalog);
 
   if (config.nodeEnv === "production") {
     await app.register(fastifyStatic, {

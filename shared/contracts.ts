@@ -43,6 +43,63 @@ export const SessionDraftSchema = Type.Object(
 
 export type SessionDraft = Static<typeof SessionDraftSchema>;
 
+export const AssetSchema = Type.Object(
+  {
+    id: Type.String(),
+    sessionId: Type.String(),
+    kind: Type.Union([Type.Literal("reference"), Type.Literal("output")]),
+    mimeType: Type.Union([
+      Type.Literal("image/png"),
+      Type.Literal("image/jpeg"),
+      Type.Literal("image/webp"),
+    ]),
+    bytes: Type.Integer({ minimum: 0 }),
+    createdAt: Type.String(),
+  },
+  { additionalProperties: false },
+);
+
+export type Asset = Static<typeof AssetSchema>;
+
+export const ImageModelSchema = Type.Object(
+  {
+    providerId: Type.String(),
+    modelId: Type.String(),
+    name: Type.String(),
+    description: Type.Optional(Type.String()),
+    inputModalities: Type.Array(
+      Type.Union([Type.Literal("text"), Type.Literal("image")]),
+    ),
+    capabilities: Type.Optional(
+      Type.Object(
+        {
+          referenceImages: Type.Optional(Type.Boolean()),
+          maxReferenceImages: Type.Optional(Type.Integer({ minimum: 1 })),
+          maxImagesPerRequest: Type.Optional(Type.Integer({ minimum: 1 })),
+          resolutions: Type.Optional(Type.Array(ResolutionSchema)),
+          aspectRatios: Type.Optional(Type.Array(AspectRatioSchema)),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+  },
+  { additionalProperties: false },
+);
+
+export type ImageModel = Static<typeof ImageModelSchema>;
+
+export const ModelCatalogSchema = Type.Object(
+  {
+    models: Type.Array(ImageModelSchema),
+    fetchedAt: Type.String(),
+    stale: Type.Boolean(),
+    error: Type.Optional(Type.String()),
+  },
+  { additionalProperties: false },
+);
+
+export type ModelCatalog = Static<typeof ModelCatalogSchema>;
+
 export const SessionSummarySchema = Type.Object(
   {
     id: Type.String(),
@@ -63,6 +120,7 @@ export const SessionDetailSchema = Type.Intersect([
   Type.Object(
     {
       draft: SessionDraftSchema,
+      references: Type.Array(AssetSchema),
     },
     { additionalProperties: false },
   ),
