@@ -54,13 +54,18 @@ export function OutputSection({
       ),
     ];
   });
-  const lightboxImage = galleryItems.find(
-    ({ output }) => output?.id === lightboxId,
+  const lightboxItems = galleryItems.flatMap(({ job, run, output }) =>
+    output ? [{ job, run, output }] : [],
   );
+  const lightboxIndex = lightboxItems.findIndex(
+    ({ output }) => output.id === lightboxId,
+  );
+  const lightboxImage = lightboxItems[lightboxIndex];
   const actionsBusy = busyItemId !== null;
   const galleryKey = galleryItems
     .map(({ job, output }) => output?.id ?? job.id)
     .join(":");
+  const lightboxKey = lightboxItems.map(({ output }) => output.id).join(":");
 
   useEffect(() => {
     const element = galleryRef.current;
@@ -89,6 +94,30 @@ export function OutputSection({
       grid.destroy();
     };
   }, [galleryKey]);
+
+  useEffect(() => {
+    if (!lightboxImage) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setLightboxId(null);
+        return;
+      }
+
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+
+      const direction = event.key === "ArrowRight" ? 1 : -1;
+      const nextIndex =
+        (lightboxIndex + direction + lightboxItems.length) %
+        lightboxItems.length;
+      const nextImage = lightboxItems[nextIndex];
+      if (nextImage) setLightboxId(nextImage.output.id);
+      event.preventDefault();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [lightboxImage, lightboxIndex, lightboxKey]);
 
   if (!session.runs.length) return null;
 
@@ -179,32 +208,51 @@ export function OutputSection({
         </details>
       )}
 
-      {lightboxImage?.output && (
+      {lightboxImage && (
         <dialog
           open
           class="modal modal-open bg-black/80 p-4"
           aria-label={`Generated image from ${lightboxImage.job.modelName}`}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") setLightboxId(null);
-          }}
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setLightboxId(null);
-          }}
+          onClick={() => setLightboxId(null)}
         >
           <div class="relative flex h-[90vh] w-[95vw] items-center justify-center">
-            <img
-              class="max-h-full max-w-full object-contain"
-              src={`/api/assets/${encodeURIComponent(lightboxImage.output.id)}`}
-              alt={`Expanded generated image for ${lightboxImage.job.modelName}`}
-            />
-            <button
-              class="btn btn-circle btn-sm absolute top-2 right-2"
-              type="button"
-              onClick={() => setLightboxId(null)}
-              aria-label="Close image"
+            <div
+              class="relative max-h-full max-w-full"
+              onClick={(event) => event.stopPropagation()}
             >
-              ×
-            </button>
+              <img
+                class="block max-h-[90vh] max-w-[95vw] object-contain"
+                src={`/api/assets/${encodeURIComponent(lightboxImage.output.id)}`}
+                alt={`Expanded generated image for ${lightboxImage.job.modelName}`}
+              />
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/80 to-transparent px-4 pt-12 pb-4 text-white">
+                <p class="line-clamp-3 text-sm leading-relaxed">
+                  {lightboxImage.run.prompt}
+                </p>
+                <div class="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/75">
+                  <span>{lightboxImage.job.modelName}</span>
+                  <span>
+                    {lightboxImage.job.providerId} / {lightboxImage.job.modelId}
+                  </span>
+                  <span>
+                    {lightboxImage.run.options.resolution} ·{" "}
+                    {lightboxImage.run.options.aspectRatio}
+                  </span>
+                  <span>{formatCost(lightboxImage.job)}</span>
+                  <time dateTime={lightboxImage.job.createdAt}>
+                    {formatDate(lightboxImage.job.createdAt)}
+                  </time>
+                </div>
+              </div>
+              <button
+                class="btn btn-circle btn-sm absolute top-2 right-2"
+                type="button"
+                onClick={() => setLightboxId(null)}
+                aria-label="Close image"
+              >
+                ×
+              </button>
+            </div>
           </div>
         </dialog>
       )}
