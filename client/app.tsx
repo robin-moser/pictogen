@@ -1,123 +1,437 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
+
+import {
+  createSession,
+  deleteSession,
+  getIdentity,
+  getSession,
+  listSessions,
+  updateSession,
+} from "./api.js";
+import { GenerationWorkspace } from "./components/GenerationWorkspace.js";
+import { SessionSidebar } from "./components/SessionSidebar.js";
+import type {
+  SessionDetail,
+  SessionDraft,
+  SessionSummary,
+} from "../shared/contracts.js";
+import { createEmptyDraft } from "../shared/contracts.js";
 
 type ConnectionState = "checking" | "connected" | "unavailable";
+type SaveStatus = "saved" | "pending" | "saving" | "error";
+
+function summaryFromDetail(detail: SessionDetail): SessionSummary {
+  return {
+    id: detail.id,
+    title: detail.title,
+    createdAt: detail.createdAt,
+    updatedAt: detail.updatedAt,
+    knownCostMicrousd: detail.knownCostMicrousd,
+    costComplete: detail.costComplete,
+    activeJobCount: detail.activeJobCount,
+  };
+}
+
+function sortSessions(sessions: SessionSummary[]) {
+  return [...sessions].sort((left, right) =>
+    right.updatedAt.localeCompare(left.updatedAt),
+  );
+}
+
+function setSessionUrl(sessionId: string | null) {
+  const url = new URL(window.location.href);
+
+  if (sessionId) {
+    url.searchParams.set("session", sessionId);
+  } else {
+    url.searchParams.delete("session");
+  }
+
+  window.history.replaceState(null, "", url);
+}
 
 export function App() {
   const [connection, setConnection] = useState<ConnectionState>("checking");
+  const [user, setUser] = useState("user");
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [activeSession, setActiveSession] = useState<SessionDetail | null>(
+    null,
+  );
+  const [draft, setDraft] = useState<SessionDraft>(createEmptyDraft);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
+  const [busySessionId, setBusySessionId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const activeSessionRef = useRef<SessionDetail | null>(null);
+  const draftRef = useRef(draft);
+  const persistedDraftRef = useRef("");
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savePromiseRef = useRef<Promise<boolean> | null>(null);
+  const sessionRequestRef = useRef(0);
+
+  function updateSessionList(detail: SessionDetail) {
+    const summary = summaryFromDetail(detail);
+    setSessions((current) =>
+      sortSessions([
+        summary,
+        ...current.filter((item) => item.id !== summary.id),
+      ]),
+    );
+  }
+
+  function activate(detail: SessionDetail | null) {
+    activeSessionRef.current = detail;
+    setActiveSession(detail);
+
+    if (detail) {
+      draftRef.current = detail.draft;
+      persistedDraftRef.current = JSON.stringify(detail.draft);
+      setDraft(detail.draft);
+      setSaveStatus("saved");
+    } else {
+      const emptyDraft = createEmptyDraft();
+      draftRef.current = emptyDraft;
+      persistedDraftRef.current = "";
+      setDraft(emptyDraft);
+      setSaveStatus("saved");
+    }
+  }
+
+  async function saveCurrentDraft(): Promise<boolean> {
+    if (savePromiseRef.current) {
+      await savePromiseRef.current;
+    }
+
+    const session = activeSessionRef.current;
+    const draftToSave = draftRef.current;
+    const serializedDraft = JSON.stringify(draftToSave);
+
+    if (!session || serializedDraft === persistedDraftRef.current) {
+      return true;
+    }
+
+    setSaveStatus("saving");
+    const save = updateSession(session.id, { draft: draftToSave })
+      .then((updated) => {
+        persistedDraftRef.current = serializedDraft;
+        updateSessionList(updated);
+
+        if (activeSessionRef.current?.id === updated.id) {
+          const currentDetail = { ...updated, draft: draftRef.current };
+          activeSessionRef.current = currentDetail;
+          setActiveSession(currentDetail);
+          setSaveStatus(
+            JSON.stringify(draftRef.current) === serializedDraft
+              ? "saved"
+              : "pending",
+          );
+        }
+
+        return true;
+      })
+      .catch((saveError: unknown) => {
+        setSaveStatus("error");
+        setError(
+          saveError instanceof Error
+            ? saveError.message
+            : "The draft could not be saved.",
+        );
+        return false;
+      })
+      .finally(() => {
+        savePromiseRef.current = null;
+      });
+
+    savePromiseRef.current = save;
+    return save;
+  }
+
+  async function flushDraft() {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+
+    return saveCurrentDraft();
+  }
 
   useEffect(() => {
     const controller = new AbortController();
 
-    async function checkHealth() {
+    async function loadWorkspace() {
       try {
-        const response = await fetch("/api/health", {
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error("Health check failed.");
-        }
-
+        const [identity, sessionList] = await Promise.all([
+          getIdentity(controller.signal),
+          listSessions(controller.signal),
+        ]);
+        setUser(identity.user);
+        setSessions(sessionList);
         setConnection("connected");
-      } catch (error) {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
+
+        const requestedSessionId = new URL(
+          window.location.href,
+        ).searchParams.get("session");
+
+        if (requestedSessionId) {
+          try {
+            const detail = await getSession(
+              requestedSessionId,
+              controller.signal,
+            );
+            activate(detail);
+          } catch (sessionError) {
+            if (!controller.signal.aborted) {
+              setSessionUrl(null);
+              setError(
+                sessionError instanceof Error
+                  ? sessionError.message
+                  : "The session could not be opened.",
+              );
+            }
+          }
+        }
+      } catch (loadError) {
+        if (!controller.signal.aborted) {
           setConnection("unavailable");
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "The workspace could not be loaded.",
+          );
         }
       }
     }
 
-    void checkHealth();
-
-    return () => {
-      controller.abort();
-    };
+    void loadWorkspace();
+    return () => controller.abort();
   }, []);
 
+  useEffect(() => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+
+    if (!activeSession || JSON.stringify(draft) === persistedDraftRef.current) {
+      return;
+    }
+
+    setSaveStatus("pending");
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      void saveCurrentDraft();
+    }, 700);
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
+  }, [activeSession?.id, draft]);
+
+  function changeDraft(nextDraft: SessionDraft) {
+    draftRef.current = nextDraft;
+    setDraft(nextDraft);
+  }
+
+  async function handleCreate(title: string) {
+    if (!(await flushDraft())) {
+      return false;
+    }
+
+    try {
+      setError(null);
+      const created = await createSession(title);
+      updateSessionList(created);
+      activate(created);
+      setSessionUrl(created.id);
+      setDrawerOpen(false);
+      return true;
+    } catch (createError) {
+      setError(
+        createError instanceof Error
+          ? createError.message
+          : "The session could not be created.",
+      );
+      return false;
+    }
+  }
+
+  async function handleOpen(sessionId: string) {
+    setDrawerOpen(false);
+
+    if (sessionId === activeSessionRef.current?.id) {
+      return;
+    }
+
+    if (!(await flushDraft())) {
+      return;
+    }
+
+    const requestId = ++sessionRequestRef.current;
+    setBusySessionId(sessionId);
+    setError(null);
+
+    try {
+      const detail = await getSession(sessionId);
+
+      if (requestId === sessionRequestRef.current) {
+        activate(detail);
+        setSessionUrl(detail.id);
+      }
+    } catch (openError) {
+      if (requestId === sessionRequestRef.current) {
+        setError(
+          openError instanceof Error
+            ? openError.message
+            : "The session could not be opened.",
+        );
+      }
+    } finally {
+      if (requestId === sessionRequestRef.current) {
+        setBusySessionId(null);
+      }
+    }
+  }
+
+  async function handleClose() {
+    if (!(await flushDraft())) {
+      return;
+    }
+
+    sessionRequestRef.current += 1;
+    activate(null);
+    setSessionUrl(null);
+  }
+
+  async function handleRename(sessionId: string, title: string) {
+    try {
+      setError(null);
+      const updated = await updateSession(sessionId, { title });
+      updateSessionList(updated);
+
+      if (activeSessionRef.current?.id === sessionId) {
+        const currentDetail = { ...updated, draft: draftRef.current };
+        activeSessionRef.current = currentDetail;
+        setActiveSession(currentDetail);
+      }
+
+      return true;
+    } catch (renameError) {
+      setError(
+        renameError instanceof Error
+          ? renameError.message
+          : "The session could not be renamed.",
+      );
+      return false;
+    }
+  }
+
+  async function handleDelete(session: SessionSummary) {
+    if (!window.confirm(`Delete “${session.title}”? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setError(null);
+      await deleteSession(session.id);
+      setSessions((current) =>
+        current.filter((item) => item.id !== session.id),
+      );
+
+      if (activeSessionRef.current?.id === session.id) {
+        sessionRequestRef.current += 1;
+        activate(null);
+        setSessionUrl(null);
+      }
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "The session could not be deleted.",
+      );
+    }
+  }
+
   const status = {
-    checking: {
-      label: "Checking workspace",
-      indicator: "status-neutral",
-      text: "text-base-content/60",
-    },
-    connected: {
-      label: "Workspace connected",
-      indicator: "status-success",
-      text: "text-success",
-    },
-    unavailable: {
-      label: "Server unavailable",
-      indicator: "status-error",
-      text: "text-error",
-    },
+    checking: { label: "Connecting", indicator: "status-neutral" },
+    connected: { label: "Connected", indicator: "status-success" },
+    unavailable: { label: "Unavailable", indicator: "status-error" },
   }[connection];
 
   return (
-    <div class="bg-base-200 grid min-h-dvh grid-rows-[4rem_1fr]">
-      <header class="navbar border-base-300 bg-base-100 border-b px-4 sm:px-6">
-        <div class="navbar-start">
-          <a
-            class="link link-hover text-lg font-semibold"
-            href="/"
-            aria-label="Pictogen home"
-          >
-            Pictogen
-          </a>
-        </div>
-        <div class="navbar-end">
-          <div
-            class={`flex items-center gap-2 text-xs font-medium ${status.text}`}
-            role="status"
-          >
-            <span
-              class={`status status-xs ${status.indicator}`}
-              aria-hidden="true"
-            />
-            {status.label}
+    <div class="drawer lg:drawer-open h-dvh">
+      <input
+        id="session-drawer"
+        class="drawer-toggle"
+        type="checkbox"
+        checked={drawerOpen}
+        onChange={(event) => setDrawerOpen(event.currentTarget.checked)}
+      />
+
+      <div class="drawer-content flex min-h-0 flex-col overflow-hidden">
+        <header class="navbar border-base-300 bg-base-100 min-h-16 border-b px-4 lg:hidden">
+          <div class="navbar-start">
+            <label
+              class="btn btn-ghost btn-square drawer-button"
+              for="session-drawer"
+              aria-label="Open sessions"
+            >
+              <span class="text-lg" aria-hidden="true">
+                ≡
+              </span>
+            </label>
           </div>
-        </div>
-      </header>
+          <div class="navbar-center font-bold">Pictogen</div>
+          <div class="navbar-end">
+            <span
+              class={`status status-sm ${status.indicator}`}
+              aria-label={status.label}
+            />
+          </div>
+        </header>
 
-      <div class="grid min-h-0 grid-rows-[auto_1fr] md:grid-cols-[16rem_minmax(0,1fr)] md:grid-rows-1">
-        <aside
-          class="border-base-300 bg-base-100 border-b p-4 md:border-r md:border-b-0"
-          aria-labelledby="sessions-heading"
-        >
-          <h2 id="sessions-heading" class="px-2 py-1 text-sm font-semibold">
-            Sessions
-          </h2>
-          <p class="text-base-content/60 border-base-300 mt-2 border-t px-2 py-4 text-sm">
-            No sessions
-          </p>
-        </aside>
+        {error && (
+          <div class="alert alert-error rounded-none py-2 text-sm" role="alert">
+            <span>{error}</span>
+            <button
+              class="btn btn-ghost btn-xs ml-auto"
+              type="button"
+              aria-label="Dismiss error"
+              onClick={() => setError(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
-        <main
-          class="bg-base-100 grid min-h-0 min-w-0 grid-rows-[auto_1fr]"
-          aria-labelledby="workspace-heading"
-        >
-          <header class="border-base-300 flex min-h-20 items-center border-b px-5 py-4 sm:px-6">
-            <div>
-              <p class="text-base-content/60 text-xs font-medium uppercase">
-                Workspace
-              </p>
-              <h1 id="workspace-heading" class="text-lg font-semibold">
-                Image generation
-              </h1>
-            </div>
-          </header>
+        <GenerationWorkspace
+          session={activeSession}
+          draft={draft}
+          saveStatus={saveStatus}
+          onDraftChange={changeDraft}
+          onClose={() => void handleClose()}
+          onCreate={() => void handleCreate("Untitled session")}
+        />
+      </div>
 
-          <section class="hero min-h-0 px-5 py-10">
-            <div class="hero-content text-center">
-              <div class="card card-border card-sm bg-base-100 max-w-md">
-                <div class="card-body items-center">
-                  <h2 class="card-title">No session selected</h2>
-                  <p class="text-base-content/60">
-                    Select a session to edit a prompt and view generated images.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-        </main>
+      <div class="drawer-side z-20">
+        <label
+          class="drawer-overlay"
+          for="session-drawer"
+          aria-label="Close sessions"
+        />
+        <SessionSidebar
+          sessions={sessions}
+          activeSessionId={activeSession?.id ?? null}
+          user={user}
+          busySessionId={busySessionId}
+          onCreate={handleCreate}
+          onOpen={(sessionId) => void handleOpen(sessionId)}
+          onRename={handleRename}
+          onDelete={(session) => void handleDelete(session)}
+        />
       </div>
     </div>
   );
