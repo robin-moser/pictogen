@@ -19,11 +19,19 @@ type Props = {
 
 const resolutions = ["512", "1K", "2K", "4K"] as const;
 const squareAspectRatio = "1:1" as const;
-const landscapeAspectRatios = ["16:9", "3:2", "4:3"] as const;
-const portraitAspectRatios = ["9:16", "2:3", "3:4"] as const;
+// Rendered as two orientation rows with the square notched into the middle.
+// The middle column's labels sit clear of the notch.
+const orientationAspectRatios = [
+  { ratio: "16:9", align: "" },
+  { ratio: "3:2", align: "items-start pt-1" },
+  { ratio: "4:3", align: "" },
+  { ratio: "9:16", align: "" },
+  { ratio: "2:3", align: "items-end pb-1" },
+  { ratio: "3:4", align: "" },
+] as const;
 
-const optionButton = "btn h-11 border-base-300 bg-base-100 font-medium";
-const optionButtonActive = "btn h-11 btn-primary font-semibold";
+const optionButton = "btn border-base-300 bg-base-100 font-medium";
+const optionButtonActive = "btn btn-primary font-semibold";
 
 export function SettingsSidebar({
   draft,
@@ -252,11 +260,11 @@ export function SettingsSidebar({
               {resolutions.map((resolution) => (
                 <button
                   key={resolution}
-                  class={
+                  class={`h-11 ${
                     draft.resolution === resolution
                       ? optionButtonActive
                       : optionButton
-                  }
+                  }`}
                   type="button"
                   aria-pressed={draft.resolution === resolution}
                   onClick={() => onDraftChange({ ...draft, resolution })}
@@ -271,9 +279,29 @@ export function SettingsSidebar({
             <legend class="text-base-content/55 mb-2 text-xs font-medium">
               Aspect ratio
             </legend>
-            <div class="grid grid-cols-4 grid-rows-2 gap-2">
+            <div class="relative">
+              <div class="grid grid-cols-3 grid-rows-2 gap-2">
+                {orientationAspectRatios.map(({ ratio, align }) => (
+                  <button
+                    key={ratio}
+                    class={`h-12 ${align} ${
+                      draft.aspectRatio === ratio
+                        ? optionButtonActive
+                        : optionButton
+                    }`}
+                    type="button"
+                    aria-pressed={draft.aspectRatio === ratio}
+                    onClick={() =>
+                      onDraftChange({ ...draft, aspectRatio: ratio })
+                    }
+                  >
+                    {ratio}
+                  </button>
+                ))}
+              </div>
+
               <button
-                class={`row-span-2 h-full ${
+                class={`ring-base-200 absolute top-1/2 left-1/2 z-10 size-11 -translate-x-1/2 -translate-y-1/2 px-0 text-xs ring-4 ${
                   draft.aspectRatio === squareAspectRatio
                     ? optionButtonActive
                     : optionButton
@@ -286,24 +314,6 @@ export function SettingsSidebar({
               >
                 {squareAspectRatio}
               </button>
-
-              {[...landscapeAspectRatios, ...portraitAspectRatios].map(
-                (aspectRatio) => (
-                  <button
-                    key={aspectRatio}
-                    class={
-                      draft.aspectRatio === aspectRatio
-                        ? optionButtonActive
-                        : optionButton
-                    }
-                    type="button"
-                    aria-pressed={draft.aspectRatio === aspectRatio}
-                    onClick={() => onDraftChange({ ...draft, aspectRatio })}
-                  >
-                    {aspectRatio}
-                  </button>
-                ),
-              )}
             </div>
           </fieldset>
 
