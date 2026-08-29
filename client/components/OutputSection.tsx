@@ -1,4 +1,5 @@
 import { MasonryGrid } from "@egjs/grid";
+import { decodeBlurHash } from "fast-blurhash";
 import { useEffect, useRef, useState } from "preact/hooks";
 
 import type { SessionDetail } from "../../shared/contracts.js";
@@ -52,7 +53,6 @@ export function OutputSection({
   const [lightboxControlsVisible, setLightboxControlsVisible] = useState(true);
   const [revealedItemId, setRevealedItemId] = useState<string | null>(null);
   const galleryRef = useRef<HTMLDivElement>(null);
-  const masonryRef = useRef<MasonryGrid | null>(null);
 
   const jobs = session.runs.flatMap((run) =>
     run.jobs.map((job) => ({ job, run })),
@@ -100,7 +100,6 @@ export function OutputSection({
       useResizeObserver: true,
       observeChildren: true,
     });
-    masonryRef.current = grid;
     const updateLayout = () => {
       grid.gap = large.matches ? 12 : 8;
       grid.renderItems({ useOrgResize: true });
@@ -114,13 +113,8 @@ export function OutputSection({
       small.removeEventListener("change", updateLayout);
       large.removeEventListener("change", updateLayout);
       grid.destroy();
-      masonryRef.current = null;
     };
   }, [columns, galleryKey]);
-
-  function handleImageLoad() {
-    masonryRef.current?.renderItems({ useOrgResize: true });
-  }
 
   function step(direction: number) {
     if (!lightboxItems.length) return;
@@ -227,7 +221,6 @@ export function OutputSection({
               onDelete={() => output && onDeleteOutput(output.id)}
               onRestore={() => onRestoreOutput(run, job)}
               onAddReference={() => output && onAddOutputReference(output.id)}
-              onImageLoad={handleImageLoad}
             />
           ))}
         </div>
@@ -402,7 +395,6 @@ function GalleryItem({
   onDelete,
   onRestore,
   onAddReference,
-  onImageLoad,
 }: {
   job: Job;
   run: Run;
@@ -416,19 +408,26 @@ function GalleryItem({
   onDelete: () => void;
   onRestore: () => void;
   onAddReference: () => void;
-  onImageLoad: () => void;
 }) {
-  const aspectRatio = run.options.aspectRatio.replace(":", " / ");
+  const [fallbackWidth = 1, fallbackHeight = 1] = (
+    job.effectiveOptions.aspectRatio ?? run.options.aspectRatio
+  )
+    .split(":")
+    .map(Number);
+  const aspectWidth = output?.width ?? fallbackWidth;
+  const aspectHeight = output?.height ?? fallbackHeight;
   const itemId = output?.id ?? job.id;
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   return (
     <figure
       class="group bg-base-200 border-base-300 focus-within:outline-primary relative overflow-hidden rounded-box border outline-offset-2 focus-within:outline-2"
-      style={output ? undefined : { aspectRatio }}
+      data-grid-width={aspectWidth}
+      data-grid-height={aspectHeight}
     >
       {output ? (
         <button
-          class="block w-full cursor-pointer text-left"
+          class="block h-full w-full cursor-pointer text-left"
           type="button"
           onClick={(event) => {
             if (
@@ -445,12 +444,24 @@ function GalleryItem({
           aria-controls={`gallery-details-${itemId}`}
           aria-label={`Open generated image for ${job.modelName}`}
         >
+          {output.blurHash ? (
+            <BlurHashPlaceholder
+              blurHash={output.blurHash}
+              width={aspectWidth}
+              height={aspectHeight}
+              hidden={imageLoaded}
+            />
+          ) : (
+            !imageLoaded && (
+              <span class="bg-base-200 absolute inset-0 animate-pulse" />
+            )
+          )}
           <img
-            class="block h-auto w-full transition duration-300 group-hover:scale-[1.03]"
+            class={`block size-full object-cover transition duration-300 ${imageLoaded ? "opacity-100 group-hover:scale-[1.03]" : "opacity-0"}`}
             loading="lazy"
             src={`/api/assets/${encodeURIComponent(output.id)}`}
             alt={`Generated image for ${job.modelName}`}
-            onLoad={onImageLoad}
+            onLoad={() => setImageLoaded(true)}
           />
         </button>
       ) : (
@@ -550,6 +561,45 @@ function GalleryItem({
         </figcaption>
       </div>
     </figure>
+  );
+}
+
+function BlurHashPlaceholder({
+  blurHash,
+  width,
+  height,
+  hidden,
+}: {
+  blurHash: string;
+  width: number;
+  height: number;
+  hidden: boolean;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const scale = 32 / Math.max(width, height);
+    const pixelWidth = Math.max(1, Math.round(width * scale));
+    const pixelHeight = Math.max(1, Math.round(height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) return;
+
+    canvas.width = pixelWidth;
+    canvas.height = pixelHeight;
+    const imageData = context.createImageData(pixelWidth, pixelHeight);
+    imageData.data.set(decodeBlurHash(blurHash, pixelWidth, pixelHeight));
+    context.putImageData(imageData, 0, 0);
+  }, [blurHash, width, height]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      class={`absolute inset-0 size-full transition-opacity duration-300 ${hidden ? "opacity-0" : "opacity-100"}`}
+      aria-hidden="true"
+    />
   );
 }
 
