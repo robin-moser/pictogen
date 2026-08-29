@@ -11,6 +11,7 @@ import {
   SessionDraftSchema,
   SessionSummarySchema,
   createEmptyDraft,
+  normalizeSessionDraft,
 } from "../../shared/contracts.js";
 import type {
   SessionDetail,
@@ -90,7 +91,7 @@ function detailFromRow(
 ): SessionDetail {
   return {
     ...summaryFromRow(database, row),
-    draft: JSON.parse(row.draftJson) as SessionDraft,
+    draft: normalizeSessionDraft(JSON.parse(row.draftJson) as SessionDraft),
     references,
     runs: database.orm
       .select({ id: generationRuns.id })

@@ -21,7 +21,7 @@ import type {
   SessionSummary,
   Asset,
 } from "../shared/contracts.js";
-import { createEmptyDraft } from "../shared/contracts.js";
+import { composePrompt, createEmptyDraft } from "../shared/contracts.js";
 
 type ConnectionState = "checking" | "connected" | "unavailable";
 type SaveStatus = "saved" | "pending" | "saving" | "error";
@@ -330,7 +330,7 @@ export function App() {
     try {
       setError(null);
       const { run } = await createRun(session.id, {
-        prompt: draftRef.current.prompt,
+        prompt: composePrompt(draftRef.current),
         models: draftRef.current.models,
         count: draftRef.current.count,
         options: {
@@ -606,6 +606,7 @@ export function App() {
     changeDraft({
       ...draftRef.current,
       prompt: run.prompt,
+      promptModifiers: {},
       referenceAssetIds: job.referenceAssetIds.filter((assetId) =>
         availableReferenceIds.has(assetId),
       ),

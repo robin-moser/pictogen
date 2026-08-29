@@ -69,6 +69,7 @@ describe("session API", () => {
     const draft = {
       ...createEmptyDraft(),
       prompt: "Editorial photograph of a lighthouse in winter fog",
+      promptModifiers: { shot: ", establishing shot" },
       resolution: "2K" as const,
       aspectRatio: "16:9" as const,
       count: 3,

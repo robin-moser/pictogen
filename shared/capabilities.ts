@@ -143,7 +143,7 @@ export function resolveEffectiveOptions(
 }
 
 export function getReferenceLimitErrors(
-  draft: SessionDraft,
+  draft: Pick<SessionDraft, "models" | "referenceAssetIds">,
   models: ImageModel[],
 ) {
   const referenceCount = draft.referenceAssetIds.length;

@@ -101,10 +101,7 @@ export function registerGenerationRoutes(
       const models = selectedModels as ImageModel[];
       const referenceLimitErrors = getReferenceLimitErrors(
         {
-          ...request.body.options,
-          prompt: request.body.prompt,
           models: request.body.models,
-          count: request.body.count,
           referenceAssetIds: request.body.referenceAssetIds,
         },
         models,

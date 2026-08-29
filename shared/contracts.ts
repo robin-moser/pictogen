@@ -45,10 +45,68 @@ export const OutputFormatSchema = Type.Union([
   Type.Literal("webp"),
 ]);
 
+export const promptModifierValues = {
+  shot: [
+    ", extreme close-up",
+    ", low-angle shot",
+    ", high-angle shot",
+    ", aerial shot",
+    ", close-up shot",
+    ", close-up portrait",
+    ", macro shot",
+    ", wide-angle shot",
+    ", establishing shot",
+    ", over-the-shoulder shot",
+    ", telephoto shot",
+    ", handheld shot",
+    ", panoramic shot",
+    ", dramatic angle, extreme angle shot",
+  ],
+  color: [
+    ", vibrant color grading",
+    ", warm color grading",
+    ", cool-toned color grading",
+    ", pastel color grading",
+    ", bright color grading",
+    ", muted color grading",
+    ", neon color grading",
+    ", duotone color grading",
+    ", monochrome",
+    ", cool-toned sterile colors",
+  ],
+  effect: [
+    ", bokeh",
+    ", tilt-shift effect",
+    ", soft focus",
+    ", shallow depth of field",
+    ", chromatic aberrations",
+    ", light leaks",
+    ", rear projection",
+    ", lens flare",
+    ", long exposure",
+    ", golden hour",
+    ", silhouette",
+  ],
+} as const;
+
+function promptModifierSchema(values: readonly string[]) {
+  return Type.Union(values.map((value) => Type.Literal(value)));
+}
+
+export const PromptModifiersSchema = Type.Object(
+  {
+    shot: Type.Optional(promptModifierSchema(promptModifierValues.shot)),
+    color: Type.Optional(promptModifierSchema(promptModifierValues.color)),
+    effect: Type.Optional(promptModifierSchema(promptModifierValues.effect)),
+  },
+  { additionalProperties: false },
+);
+
 export const SessionDraftSchema = Type.Object(
   {
     prompt: Type.String({ maxLength: 12_000 }),
-    models: Type.Array(ModelSelectionSchema, { maxItems: 3 }),
+    promptModifiers: PromptModifiersSchema,
+    models: Type.Array(ModelSelectionSchema),
     resolution: ResolutionSchema,
     aspectRatio: AspectRatioSchema,
     quality: Type.Optional(QualitySchema),
@@ -68,6 +126,29 @@ export const SessionDraftSchema = Type.Object(
 
 export type SessionDraft = Static<typeof SessionDraftSchema>;
 
+export function composePrompt(draft: SessionDraft): string {
+  const { shot, color, effect } = draft.promptModifiers;
+  return `${draft.prompt}${shot ?? ""}${color ?? ""}${effect ?? ""}`;
+}
+
+export function normalizeSessionDraft(draft: SessionDraft): SessionDraft {
+  if (draft.promptModifiers) return draft;
+
+  let prompt = draft.prompt;
+  const promptModifiers: SessionDraft["promptModifiers"] = {};
+  for (const key of ["effect", "color", "shot"] as const) {
+    const value = promptModifierValues[key].find((candidate) =>
+      prompt.endsWith(candidate),
+    );
+    if (value) {
+      promptModifiers[key] = value;
+      prompt = prompt.slice(0, -value.length);
+    }
+  }
+
+  return { ...draft, prompt, promptModifiers };
+}
+
 export const AssetSchema = Type.Object(
   {
     id: Type.String(),
@@ -77,6 +158,7 @@ export const AssetSchema = Type.Object(
       Type.Literal("image/png"),
       Type.Literal("image/jpeg"),
       Type.Literal("image/webp"),
+      Type.Literal("image/svg+xml"),
     ]),
     bytes: Type.Integer({ minimum: 0 }),
     createdAt: Type.String(),
@@ -156,7 +238,6 @@ export const CreateRunSchema = Type.Object(
     prompt: Type.String({ minLength: 1, maxLength: 12_000 }),
     models: Type.Array(ModelSelectionSchema, {
       minItems: 1,
-      maxItems: 3,
       uniqueItems: true,
     }),
     count: Type.Integer({ minimum: 1, maximum: 10 }),
@@ -266,6 +347,7 @@ export const ErrorResponseSchema = Type.Object({
 export function createEmptyDraft(): SessionDraft {
   return {
     prompt: "",
+    promptModifiers: {},
     models: [],
     resolution: "1K",
     aspectRatio: "1:1",
