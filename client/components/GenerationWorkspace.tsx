@@ -137,7 +137,7 @@ export function GenerationWorkspace({
           (selection) => `${selection.providerId}:${selection.modelId}` !== key,
         ),
       });
-    } else if (draft.models.length < 3)
+    } else
       onDraftChange({
         ...draft,
         models: [

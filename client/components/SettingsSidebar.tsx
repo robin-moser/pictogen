@@ -69,7 +69,6 @@ export function SettingsSidebar({
       (change) => `${model.name}: ${change}.`,
     ),
   );
-  const modelsFull = draft.models.length >= 3;
   const [hint, setHint] = useState<{
     text: string;
     top: number;
@@ -135,7 +134,7 @@ export function SettingsSidebar({
               Models
             </h3>
             <span class="text-base-content/40 text-xs tabular-nums">
-              {draft.models.length}/3
+              {draft.models.length}
             </span>
           </div>
 
@@ -201,16 +200,13 @@ export function SettingsSidebar({
                   onMouseEnter={(event) =>
                     showHint(
                       event.currentTarget,
-                      modelsFull
-                        ? "Three models already selected."
-                        : `${model.name}\n${model.providerId} / ${model.modelId}\n${model.description ?? ""}`.trim(),
+                      `${model.name}\n${model.providerId} / ${model.modelId}\n${model.description ?? ""}`.trim(),
                     )
                   }
                 >
                   <button
                     class="hover:bg-base-300/50 group/model flex w-full items-start gap-2.5 px-3 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-35"
                     type="button"
-                    disabled={modelsFull}
                     onClick={() => onToggleModel(model)}
                     onFocus={(event) =>
                       showHint(
