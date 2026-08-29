@@ -13,7 +13,10 @@ import {
   ImagePlusIcon,
   RestoreIcon,
   RestoreSizeIcon,
+  StarIcon,
   TrashIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
 } from "./Icons.js";
 
 type Job = SessionDetail["runs"][number]["jobs"][number];
@@ -27,6 +30,7 @@ type Props = {
   busyItemId: string | null;
   onCancelJob: (jobId: string) => void;
   onDeleteOutput: (assetId: string) => void;
+  onToggleOutputStar: (assetId: string, starred: boolean) => void;
   onRestoreOutput: (run: Run, job: Job) => void;
   onAddOutputReference: (assetId: string) => void;
   onDismissJob: (jobId: string) => void;
@@ -42,6 +46,7 @@ export function OutputSection({
   busyItemId,
   onCancelJob,
   onDeleteOutput,
+  onToggleOutputStar,
   onRestoreOutput,
   onAddOutputReference,
   onDismissJob,
@@ -52,18 +57,55 @@ export function OutputSection({
   const [lightboxId, setLightboxId] = useState<string | null>(null);
   const [lightboxControlsVisible, setLightboxControlsVisible] = useState(true);
   const [revealedItemId, setRevealedItemId] = useState<string | null>(null);
+  const [starredOnly, setStarredOnly] = useState(false);
+  const [runFilter, setRunFilter] = useState("all");
+  const [modelFilter, setModelFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("all");
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const galleryRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{
+    x: number;
+    y: number;
+    panX: number;
+    panY: number;
+  } | null>(null);
 
   const jobs = session.runs.flatMap((run) =>
     run.jobs.map((job) => ({ job, run })),
   );
   const failures = jobs.filter(({ job }) => job.status === "failed");
-  const galleryItems = jobs.flatMap(({ job, run }) => {
+  const models = Array.from(
+    new Map(
+      jobs.map(({ job }) => [
+        `${job.providerId}:${job.modelId}`,
+        { key: `${job.providerId}:${job.modelId}`, name: job.modelName },
+      ]),
+    ).values(),
+  );
+  const dateCutoff = getDateCutoff(dateFilter);
+  const filteredJobs = jobs.filter(({ job, run }) => {
+    if (runFilter !== "all" && run.id !== runFilter) return false;
+    if (
+      modelFilter !== "all" &&
+      `${job.providerId}:${job.modelId}` !== modelFilter
+    )
+      return false;
+    if (statusFilter !== "all" && job.status !== statusFilter) return false;
+    if (dateCutoff && new Date(job.createdAt).getTime() < dateCutoff)
+      return false;
+    return !starredOnly || job.outputs.some((output) => output.starred);
+  });
+  const galleryItems = filteredJobs.flatMap(({ job, run }) => {
     if (job.status === "failed" || job.status === "cancelled") {
       return [];
     }
 
-    const outputs = job.outputs.map((output) => ({ job, run, output }));
+    const outputs = job.outputs
+      .filter((output) => !starredOnly || output.starred)
+      .map((output) => ({ job, run, output }));
+    if (starredOnly) return outputs;
     if (job.status !== "queued" && job.status !== "running") return outputs;
 
     return [
@@ -86,6 +128,24 @@ export function OutputSection({
     .map(({ job, output }) => output?.id ?? job.id)
     .join(":");
   const lightboxKey = lightboxItems.map(({ output }) => output.id).join(":");
+
+  useEffect(() => {
+    setRunFilter("all");
+    setModelFilter("all");
+    setStatusFilter("all");
+    setDateFilter("all");
+    setStarredOnly(false);
+  }, [session.id]);
+
+  useEffect(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    dragRef.current = null;
+  }, [lightboxId]);
+
+  useEffect(() => {
+    if (lightboxId && !lightboxImage) setLightboxId(null);
+  }, [lightboxId, lightboxKey]);
 
   useEffect(() => {
     const element = galleryRef.current;
@@ -132,6 +192,12 @@ export function OutputSection({
     setLightboxControlsVisible(true);
   }
 
+  function changeZoom(nextZoom: number) {
+    const clamped = Math.min(4, Math.max(1, nextZoom));
+    setZoom(clamped);
+    if (clamped === 1) setPan({ x: 0, y: 0 });
+  }
+
   useEffect(() => {
     if (!lightboxImage) return;
 
@@ -159,7 +225,7 @@ export function OutputSection({
 
   return (
     <section class="pt-6" aria-labelledby="gallery-heading">
-      <div class="mb-4 flex items-center gap-3">
+      <div class="mb-3 flex items-center gap-3">
         <h2 id="gallery-heading" class="field-legend flex items-center gap-1.5">
           Gallery
           <span class="text-base-content/30 tabular-nums">
@@ -204,6 +270,67 @@ export function OutputSection({
         </button>
       </div>
 
+      <div class="mb-4 flex items-center gap-2 overflow-x-auto pb-1">
+        <button
+          class={`btn btn-xs shrink-0 ${starredOnly ? "btn-primary" : "btn-ghost"}`}
+          type="button"
+          aria-pressed={starredOnly}
+          onClick={() => setStarredOnly((current) => !current)}
+        >
+          <StarIcon class={`size-3.5 ${starredOnly ? "fill-current" : ""}`} />
+          Shortlist
+        </button>
+        <select
+          class="select select-xs w-auto max-w-40 shrink-0"
+          aria-label="Filter by run"
+          value={runFilter}
+          onChange={(event) => setRunFilter(event.currentTarget.value)}
+        >
+          <option value="all">All runs</option>
+          {session.runs.map((run, index) => (
+            <option key={run.id} value={run.id}>
+              Run {session.runs.length - index} ·{" "}
+              {formatShortDate(run.createdAt)}
+            </option>
+          ))}
+        </select>
+        <select
+          class="select select-xs w-auto max-w-44 shrink-0"
+          aria-label="Filter by model"
+          value={modelFilter}
+          onChange={(event) => setModelFilter(event.currentTarget.value)}
+        >
+          <option value="all">All models</option>
+          {models.map((model) => (
+            <option key={model.key} value={model.key}>
+              {model.name}
+            </option>
+          ))}
+        </select>
+        <select
+          class="select select-xs w-auto shrink-0"
+          aria-label="Filter by status"
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.currentTarget.value)}
+        >
+          <option value="all">All statuses</option>
+          <option value="succeeded">Succeeded</option>
+          <option value="running">Running</option>
+          <option value="queued">Queued</option>
+        </select>
+        <select
+          class="select select-xs w-auto shrink-0"
+          aria-label="Filter by date"
+          value={dateFilter}
+          onChange={(event) => setDateFilter(event.currentTarget.value)}
+        >
+          <option value="all">Any date</option>
+          <option value="today">Today</option>
+          <option value="7d">Last 7 days</option>
+          <option value="30d">Last 30 days</option>
+        </select>
+      </div>
+
       {galleryItems.length > 0 && (
         <div ref={galleryRef}>
           {galleryItems.map(({ job, run, output }, index) => (
@@ -219,11 +346,20 @@ export function OutputSection({
               onOpen={openLightbox}
               onCancel={() => onCancelJob(job.id)}
               onDelete={() => output && onDeleteOutput(output.id)}
+              onToggleStar={() =>
+                output && onToggleOutputStar(output.id, !output.starred)
+              }
               onRestore={() => onRestoreOutput(run, job)}
               onAddReference={() => output && onAddOutputReference(output.id)}
             />
           ))}
         </div>
+      )}
+
+      {galleryItems.length === 0 && (
+        <p class="text-base-content/35 py-12 text-center text-xs">
+          No images match these filters.
+        </p>
       )}
 
       {failures.length > 0 && (
@@ -285,25 +421,63 @@ export function OutputSection({
           aria-label={`Generated image from ${lightboxImage.job.modelName}`}
           onClick={() => setLightboxId(null)}
         >
-          <div class="relative flex h-dvh w-screen items-center justify-center p-4">
+          <div class="relative flex h-dvh w-screen items-center justify-center overflow-hidden p-4">
             <div
-              class="relative max-h-full max-w-full"
-              onClick={(event) => event.stopPropagation()}
+              class={`relative flex size-full touch-none items-center justify-center overflow-hidden ${zoom > 1 ? "cursor-grab active:cursor-grabbing" : ""}`}
+              onClick={(event) => {
+                if (event.target === event.currentTarget) setLightboxId(null);
+                else event.stopPropagation();
+              }}
+              onWheel={(event) => {
+                event.preventDefault();
+                changeZoom(zoom + (event.deltaY < 0 ? 0.25 : -0.25));
+              }}
             >
-              <button
-                class="block cursor-pointer"
-                type="button"
+              <img
+                class="block max-h-[88vh] max-w-[92vw] select-none object-contain"
+                style={{
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                }}
+                draggable={false}
+                role="button"
+                tabindex={0}
+                src={`/api/assets/${encodeURIComponent(lightboxImage.output.id)}`}
+                alt={`Expanded generated image for ${lightboxImage.job.modelName}`}
                 aria-label={`${lightboxControlsVisible ? "Hide" : "Show"} image information and controls`}
-                onClick={() =>
-                  setLightboxControlsVisible((visible) => !visible)
-                }
-              >
-                <img
-                  class="block max-h-[88vh] max-w-[92vw] object-contain"
-                  src={`/api/assets/${encodeURIComponent(lightboxImage.output.id)}`}
-                  alt={`Expanded generated image for ${lightboxImage.job.modelName}`}
-                />
-              </button>
+                onClick={() => {
+                  if (zoom === 1)
+                    setLightboxControlsVisible((visible) => !visible);
+                }}
+                onKeyDown={(event) => {
+                  if (
+                    zoom === 1 &&
+                    (event.key === "Enter" || event.key === " ")
+                  ) {
+                    event.preventDefault();
+                    setLightboxControlsVisible((visible) => !visible);
+                  }
+                }}
+                onPointerDown={(event) => {
+                  if (zoom === 1) return;
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                  dragRef.current = {
+                    x: event.clientX,
+                    y: event.clientY,
+                    panX: pan.x,
+                    panY: pan.y,
+                  };
+                }}
+                onPointerMove={(event) => {
+                  const drag = dragRef.current;
+                  if (!drag) return;
+                  setPan({
+                    x: drag.panX + event.clientX - drag.x,
+                    y: drag.panY + event.clientY - drag.y,
+                  });
+                }}
+                onPointerUp={() => (dragRef.current = null)}
+                onPointerCancel={() => (dragRef.current = null)}
+              />
               {lightboxControlsVisible && (
                 <>
                   <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/75 to-transparent px-4 pt-14 pb-4 text-white">
@@ -320,6 +494,8 @@ export function OutputSection({
                       </span>
                       <span>{formatEffectiveOptions(lightboxImage.job)}</span>
                       <span>{formatCost(lightboxImage.job)}</span>
+                      <span>{formatDimensions(lightboxImage.output)}</span>
+                      <span>{formatBytes(lightboxImage.output.bytes)}</span>
                       <time dateTime={lightboxImage.job.createdAt}>
                         {formatDate(lightboxImage.job.createdAt)}
                       </time>
@@ -338,6 +514,26 @@ export function OutputSection({
                     <DownloadIcon class="size-4" />
                   </a>
                   <button
+                    class={`btn btn-sm btn-square absolute top-2 right-22 border-white/15 bg-black/60 hover:bg-black ${lightboxImage.output.starred ? "text-warning" : "text-white"}`}
+                    type="button"
+                    disabled={actionsBusy}
+                    onClick={() =>
+                      onToggleOutputStar(
+                        lightboxImage.output.id,
+                        !lightboxImage.output.starred,
+                      )
+                    }
+                    aria-label={
+                      lightboxImage.output.starred
+                        ? "Remove image from shortlist"
+                        : "Add image to shortlist"
+                    }
+                  >
+                    <StarIcon
+                      class={`size-4 ${lightboxImage.output.starred ? "fill-current" : ""}`}
+                    />
+                  </button>
+                  <button
                     class="btn btn-sm btn-square absolute top-2 right-2 border-white/15 bg-black/60 text-white hover:bg-black"
                     type="button"
                     onClick={() => setLightboxId(null)}
@@ -348,6 +544,40 @@ export function OutputSection({
                 </>
               )}
             </div>
+
+            {lightboxControlsVisible && (
+              <div
+                class="join absolute top-2 left-2"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <button
+                  class="btn btn-sm btn-square join-item border-white/15 bg-black/60 text-white hover:bg-black"
+                  type="button"
+                  disabled={zoom <= 1}
+                  onClick={() => changeZoom(zoom - 0.25)}
+                  aria-label="Zoom out"
+                >
+                  <ZoomOutIcon class="size-4" />
+                </button>
+                <button
+                  class="btn btn-sm join-item border-white/15 bg-black/60 px-2 text-white hover:bg-black"
+                  type="button"
+                  onClick={() => changeZoom(1)}
+                  aria-label="Reset zoom"
+                >
+                  {Math.round(zoom * 100)}%
+                </button>
+                <button
+                  class="btn btn-sm btn-square join-item border-white/15 bg-black/60 text-white hover:bg-black"
+                  type="button"
+                  disabled={zoom >= 4}
+                  onClick={() => changeZoom(zoom + 0.25)}
+                  aria-label="Zoom in"
+                >
+                  <ZoomInIcon class="size-4" />
+                </button>
+              </div>
+            )}
 
             {lightboxControlsVisible && lightboxItems.length > 1 && (
               <>
@@ -393,6 +623,7 @@ function GalleryItem({
   onOpen,
   onCancel,
   onDelete,
+  onToggleStar,
   onRestore,
   onAddReference,
 }: {
@@ -406,6 +637,7 @@ function GalleryItem({
   onOpen: (assetId: string) => void;
   onCancel: () => void;
   onDelete: () => void;
+  onToggleStar: () => void;
   onRestore: () => void;
   onAddReference: () => void;
 }) {
@@ -494,6 +726,21 @@ function GalleryItem({
         >
           {output ? (
             <>
+              <button
+                class={`btn btn-xs btn-square border-white/15 bg-black/60 hover:bg-black ${output.starred ? "text-warning" : "text-white"}`}
+                type="button"
+                disabled={actionsBusy}
+                onClick={onToggleStar}
+                aria-label={
+                  output.starred
+                    ? `Remove image from shortlist`
+                    : `Add image to shortlist`
+                }
+              >
+                <StarIcon
+                  class={`size-3.5 ${output.starred ? "fill-current" : ""}`}
+                />
+              </button>
               <button
                 class="btn btn-xs btn-square border-white/15 bg-black/60 text-white hover:bg-black"
                 type="button"
@@ -638,6 +885,42 @@ function formatDate(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function formatShortDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function getDateCutoff(filter: string) {
+  if (filter === "all") return null;
+  const now = new Date();
+  if (filter === "today") {
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  }
+  return now.getTime() - Number.parseInt(filter, 10) * 24 * 60 * 60 * 1000;
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unit = units[0];
+  for (let index = 1; value >= 1024 && index < units.length; index += 1) {
+    value /= 1024;
+    unit = units[index];
+  }
+  return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)} ${unit}`;
+}
+
+function formatDimensions(output: Output) {
+  return output.width !== null && output.height !== null
+    ? `${output.width} × ${output.height} px`
+    : "Dimensions unavailable";
 }
 
 function downloadFilename(job: Job, output: Output) {

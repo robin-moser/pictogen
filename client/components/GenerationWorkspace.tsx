@@ -42,6 +42,7 @@ type Props = {
   busyItemId: string | null;
   onCancelJob: (jobId: string) => void;
   onDeleteOutput: (assetId: string) => void;
+  onToggleOutputStar: (assetId: string, starred: boolean) => void;
   onRestoreOutput: (
     run: SessionDetail["runs"][number],
     job: SessionDetail["runs"][number]["jobs"][number],
@@ -62,6 +63,7 @@ export function GenerationWorkspace({
   busyItemId,
   onCancelJob,
   onDeleteOutput,
+  onToggleOutputStar,
   onRestoreOutput,
   onAddOutputReference,
   onDismissJob,
@@ -233,6 +235,7 @@ export function GenerationWorkspace({
               busyItemId={busyItemId}
               onCancelJob={onCancelJob}
               onDeleteOutput={onDeleteOutput}
+              onToggleOutputStar={onToggleOutputStar}
               onRestoreOutput={onRestoreOutput}
               onAddOutputReference={onAddOutputReference}
               onDismissJob={onDismissJob}

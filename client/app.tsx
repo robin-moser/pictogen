@@ -11,6 +11,7 @@ import {
   getIdentity,
   getSession,
   listSessions,
+  updateAsset,
   updateSession,
 } from "./api.js";
 import { GenerationWorkspace } from "./components/GenerationWorkspace.js";
@@ -407,6 +408,14 @@ export function App() {
     );
   }
 
+  function handleToggleOutputStar(assetId: string, starred: boolean) {
+    return mutateSessionItem(
+      assetId,
+      () => updateAsset(assetId, { starred }),
+      "The shortlist could not be updated.",
+    );
+  }
+
   function handleDismissJob(jobId: string) {
     return mutateSessionItem(
       jobId,
@@ -642,6 +651,9 @@ export function App() {
           busyItemId={busyItemId}
           onCancelJob={(jobId) => void handleCancelJob(jobId)}
           onDeleteOutput={(assetId) => void handleDeleteOutput(assetId)}
+          onToggleOutputStar={(assetId, starred) =>
+            void handleToggleOutputStar(assetId, starred)
+          }
           onRestoreOutput={handleRestoreOutput}
           onAddOutputReference={handleAddOutputReference}
           onDismissJob={(jobId) => void handleDismissJob(jobId)}

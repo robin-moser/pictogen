@@ -112,6 +112,13 @@ export function deleteAsset(assetId: string) {
   });
 }
 
+export function updateAsset(assetId: string, update: { starred: boolean }) {
+  return request<Asset>(
+    `/api/assets/${encodeURIComponent(assetId)}`,
+    jsonRequest("PATCH", update),
+  );
+}
+
 export function createRun(sessionId: string, run: CreateRun) {
   return request<{ run: GenerationRun }>(
     `/api/sessions/${encodeURIComponent(sessionId)}/runs`,
