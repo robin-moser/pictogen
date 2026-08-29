@@ -71,7 +71,12 @@ export function GenerationWorkspace({
   const [modelSearch, setModelSearch] = useState("");
   const [modelError, setModelError] = useState<string | null>(null);
   const [catalogStale, setCatalogStale] = useState(false);
-  const [galleryColumns, setGalleryColumns] = useState(3);
+  const [galleryColumns, setGalleryColumns] = useState(() =>
+    typeof window !== "undefined" &&
+    window.matchMedia("(max-width: 47.999rem)").matches
+      ? 1
+      : 3,
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsCollapsed, setSettingsCollapsed] = useState(false);
   const [outputExpanded, setOutputExpanded] = useState(false);
@@ -184,7 +189,7 @@ export function GenerationWorkspace({
       </div>
 
       <div class="flex min-h-0 grow">
-        <div class="flex min-w-0 grow flex-col">
+        <div class="flex min-w-0 grow flex-col max-md:scroll-pane">
           {!outputExpanded && (
             <div class="shrink-0 px-4 pt-18 sm:px-6 lg:px-8 xl:pt-8">
               <PromptPanel
@@ -219,7 +224,7 @@ export function GenerationWorkspace({
           )}
 
           <div
-            class={`scroll-pane grow px-4 pb-8 sm:px-6 lg:px-8 ${outputExpanded ? "pt-14 xl:pt-0" : ""}`}
+            class={`scroll-pane grow px-4 pb-8 max-md:shrink-0 max-md:overflow-visible sm:px-6 lg:px-8 ${outputExpanded ? "pt-14 xl:pt-0" : ""}`}
           >
             <OutputSection
               session={session}

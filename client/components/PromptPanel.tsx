@@ -2,6 +2,7 @@ import type { ComponentChildren } from "preact";
 
 import { composePrompt } from "../../shared/contracts.js";
 import type { SessionDraft } from "../../shared/contracts.js";
+import { CameraIcon, PaletteIcon, SparklesIcon } from "./Icons.js";
 
 const modifierKey =
   typeof navigator !== "undefined" &&
@@ -15,6 +16,7 @@ const modifierGroups = [
     label: "Add shot...",
     color: "text-info",
     badge: "badge-info",
+    icon: CameraIcon,
     options: [
       [", extreme close-up", "extreme close-up"],
       [", low-angle shot", "low-angle"],
@@ -37,6 +39,7 @@ const modifierGroups = [
     label: "Add color...",
     color: "text-warning",
     badge: "badge-warning",
+    icon: PaletteIcon,
     options: [
       [", vibrant color grading", "vibrant"],
       [", warm color grading", "warm"],
@@ -55,6 +58,7 @@ const modifierGroups = [
     label: "Add effect...",
     color: "text-secondary",
     badge: "badge-secondary",
+    icon: SparklesIcon,
     options: [
       [", bokeh", "bokeh"],
       [", tilt-shift effect", "tilt-shift"],
@@ -154,21 +158,30 @@ export function PromptPanel({
       )}
 
       <div class="border-base-300 flex flex-wrap items-center gap-2.5 border-t px-4 py-4">
-        {modifierGroups.map((group) => (
-          <select
-            class={`select select-bordered h-11 min-h-11 w-28 text-xs ${group.color}`}
-            aria-label={group.label}
-            value={draft.promptModifiers[group.key] ?? ""}
-            onChange={(event) =>
-              selectModifier(group.key, event.currentTarget.value)
-            }
-          >
-            <option value="">{group.label}</option>
-            {group.options.map(([value, label]) => (
-              <option value={value}>{label}</option>
-            ))}
-          </select>
-        ))}
+        {modifierGroups.map((group) => {
+          const ModifierIcon = group.icon;
+          return (
+            <label
+              class={`btn btn-square border-base-300 bg-base-100 focus-within:outline-base-content/30 relative h-11 min-h-11 focus-within:outline-2 ${group.color}`}
+              title={group.label}
+            >
+              <ModifierIcon class="size-4" />
+              <select
+                class="absolute inset-0 size-full cursor-pointer opacity-0"
+                aria-label={group.label}
+                value={draft.promptModifiers[group.key] ?? ""}
+                onChange={(event) =>
+                  selectModifier(group.key, event.currentTarget.value)
+                }
+              >
+                <option value="">{group.label}</option>
+                {group.options.map(([value, label]) => (
+                  <option value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
+          );
+        })}
 
         <span
           class={`ml-1 text-xs tabular-nums ${composedPrompt.length > 12_000 ? "text-error" : "text-base-content/35"}`}

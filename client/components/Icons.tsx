@@ -99,6 +99,34 @@ export function SlidersIcon(props: IconProps) {
   );
 }
 
+export function CameraIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 7h3l1.5-2h7L17 7h3v12H4V7Z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </Icon>
+  );
+}
+
+export function PaletteIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3a9 9 0 1 0 0 18h1.2a1.8 1.8 0 0 0 1.3-3l-.4-.4a1.8 1.8 0 0 1 1.3-3h2.1A3.5 3.5 0 0 0 21 11 8 8 0 0 0 12 3Z" />
+      <circle cx="7.5" cy="11" r=".75" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="7" r=".75" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="7.5" r=".75" fill="currentColor" stroke="none" />
+    </Icon>
+  );
+}
+
+export function SparklesIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m12 3 1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2L12 3ZM18.5 14l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2ZM5.5 13l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8Z" />
+    </Icon>
+  );
+}
+
 export function SunIcon(props: IconProps) {
   return (
     <Icon {...props}>
