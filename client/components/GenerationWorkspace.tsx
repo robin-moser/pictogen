@@ -239,11 +239,11 @@ export function GenerationWorkspace({
           <aside
             class={
               wideLayout
-                ? "border-base-300 m-4 ml-0 w-88 shrink-0 overflow-hidden rounded-box border shadow-sm"
-                : `border-base-300 fixed top-3 right-3 bottom-3 z-40 w-88 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-box border shadow-xl transition-transform duration-200 ${
+                ? "border-base-300 m-8 ml-0 w-88 shrink-0 overflow-hidden rounded-box border shadow-sm"
+                : `border-base-300 fixed top-4 right-4 bottom-4 z-40 w-88 max-w-[calc(100vw-2rem)] overflow-hidden rounded-box border shadow-xl transition-transform duration-200 sm:top-6 sm:right-6 sm:bottom-6 sm:max-w-[calc(100vw-3rem)] ${
                     settingsOpen
                       ? "translate-x-0"
-                      : "translate-x-[calc(100%+0.75rem)]"
+                      : "translate-x-[calc(100%+1.5rem)]"
                   }`
             }
             aria-hidden={!wideLayout && !settingsOpen ? "true" : undefined}
