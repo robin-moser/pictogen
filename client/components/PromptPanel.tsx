@@ -37,8 +37,9 @@ const modifierGroups = [
   {
     key: "color",
     label: "Add color...",
-    color: "text-warning",
-    badge: "badge-warning",
+    color: "text-rose-800 dark:text-rose-300",
+    badge:
+      "[--badge-color:var(--color-rose-800)] dark:[--badge-color:var(--color-rose-300)]",
     icon: PaletteIcon,
     options: [
       [", vibrant color grading", "vibrant"],
@@ -56,8 +57,9 @@ const modifierGroups = [
   {
     key: "effect",
     label: "Add effect...",
-    color: "text-secondary",
-    badge: "badge-secondary",
+    color: "text-indigo-800 dark:text-indigo-300",
+    badge:
+      "[--badge-color:var(--color-indigo-800)] dark:[--badge-color:var(--color-indigo-300)]",
     icon: SparklesIcon,
     options: [
       [", bokeh", "bokeh"],
@@ -104,11 +106,33 @@ export function PromptPanel({
     key: keyof SessionDraft["promptModifiers"],
     value: string,
   ) {
+    if (!value) return;
+
+    const current = draft.promptModifiers[key] ?? [];
+    if (current.includes(value)) return;
+
     onDraftChange({
       ...draft,
       promptModifiers: {
         ...draft.promptModifiers,
-        [key]: value || undefined,
+        [key]: [...current, value],
+      },
+    });
+  }
+
+  function removeModifier(
+    key: keyof SessionDraft["promptModifiers"],
+    value: string,
+  ) {
+    const remaining = (draft.promptModifiers[key] ?? []).filter(
+      (modifier) => modifier !== value,
+    );
+
+    onDraftChange({
+      ...draft,
+      promptModifiers: {
+        ...draft.promptModifiers,
+        [key]: remaining.length > 0 ? remaining : undefined,
       },
     });
   }
@@ -146,14 +170,18 @@ export function PromptPanel({
           class="flex min-h-7 flex-wrap items-center gap-2 px-5 pb-4"
           aria-label="Added prompt modifiers"
         >
-          {modifierGroups.map((group) => {
-            const modifier = draft.promptModifiers[group.key];
-            return modifier ? (
-              <span class={`badge badge-sm badge-outline ${group.badge}`}>
+          {modifierGroups.flatMap((group) =>
+            (draft.promptModifiers[group.key] ?? []).map((modifier) => (
+              <button
+                class={`badge badge-sm badge-outline ${group.badge}`}
+                type="button"
+                title={`Remove ${modifier.slice(2)}`}
+                onClick={() => removeModifier(group.key, modifier)}
+              >
                 {modifier.slice(2)}
-              </span>
-            ) : null;
-          })}
+              </button>
+            )),
+          )}
         </div>
       )}
 
@@ -169,7 +197,7 @@ export function PromptPanel({
               <select
                 class="absolute inset-0 size-full cursor-pointer opacity-0"
                 aria-label={group.label}
-                value={draft.promptModifiers[group.key] ?? ""}
+                value=""
                 onChange={(event) =>
                   selectModifier(group.key, event.currentTarget.value)
                 }

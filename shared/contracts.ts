@@ -90,7 +90,10 @@ export const promptModifierValues = {
 } as const;
 
 function promptModifierSchema(values: readonly string[]) {
-  return Type.Union(values.map((value) => Type.Literal(value)));
+  return Type.Array(Type.Union(values.map((value) => Type.Literal(value))), {
+    maxItems: values.length,
+    uniqueItems: true,
+  });
 }
 
 export const PromptModifiersSchema = Type.Object(
@@ -128,11 +131,26 @@ export type SessionDraft = Static<typeof SessionDraftSchema>;
 
 export function composePrompt(draft: SessionDraft): string {
   const { shot, color, effect } = draft.promptModifiers;
-  return `${draft.prompt}${shot ?? ""}${color ?? ""}${effect ?? ""}`;
+  return `${draft.prompt}${shot?.join("") ?? ""}${color?.join("") ?? ""}${effect?.join("") ?? ""}`;
 }
 
 export function normalizeSessionDraft(draft: SessionDraft): SessionDraft {
-  if (draft.promptModifiers) return draft;
+  const rawModifiers = draft.promptModifiers as unknown as
+    Record<string, string | string[] | undefined> | undefined;
+
+  if (
+    rawModifiers &&
+    Object.values(rawModifiers).some((value) => value !== undefined)
+  ) {
+    const promptModifiers: SessionDraft["promptModifiers"] = {};
+    for (const key of ["shot", "color", "effect"] as const) {
+      const value = rawModifiers[key];
+      if (value !== undefined) {
+        promptModifiers[key] = Array.isArray(value) ? value : [value];
+      }
+    }
+    return { ...draft, promptModifiers };
+  }
 
   let prompt = draft.prompt;
   const promptModifiers: SessionDraft["promptModifiers"] = {};
@@ -141,7 +159,7 @@ export function normalizeSessionDraft(draft: SessionDraft): SessionDraft {
       prompt.endsWith(candidate),
     );
     if (value) {
-      promptModifiers[key] = value;
+      promptModifiers[key] = [value];
       prompt = prompt.slice(0, -value.length);
     }
   }

@@ -13,9 +13,9 @@ describe("prompt modifiers", () => {
       ...createEmptyDraft(),
       prompt: "A lighthouse in fog",
       promptModifiers: {
-        shot: ", low-angle shot",
-        color: ", cool-toned color grading",
-        effect: ", bokeh",
+        shot: [", low-angle shot"],
+        color: [", cool-toned color grading"],
+        effect: [", bokeh"],
       },
     };
 
@@ -35,9 +35,9 @@ describe("prompt modifiers", () => {
     expect(normalizeSessionDraft(legacyDraft)).toMatchObject({
       prompt: "A lighthouse in fog",
       promptModifiers: {
-        shot: ", low-angle shot",
-        color: ", cool-toned color grading",
-        effect: ", bokeh",
+        shot: [", low-angle shot"],
+        color: [", cool-toned color grading"],
+        effect: [", bokeh"],
       },
     });
   });
