@@ -605,7 +605,7 @@ export function App() {
   }
 
   return (
-    <div class={`drawer h-dvh ${sessionsCollapsed ? "" : "lg:drawer-open"}`}>
+    <div class="drawer h-dvh lg:drawer-open">
       <input
         id="session-drawer"
         class="drawer-toggle"
@@ -634,8 +634,6 @@ export function App() {
         <GenerationWorkspace
           session={activeSession}
           draft={draft}
-          sessionsCollapsed={sessionsCollapsed}
-          onExpandSessions={() => setSessionsCollapsed(false)}
           onDraftChange={changeDraft}
           onCreate={() => void handleCreate("Untitled session")}
           onReferenceUploaded={handleReferenceUploaded}
@@ -658,6 +656,7 @@ export function App() {
           aria-label="Close sessions"
         />
         <SessionSidebar
+          collapsed={sessionsCollapsed}
           sessions={sessions}
           activeSessionId={activeSession?.id ?? null}
           user={user}
@@ -674,6 +673,7 @@ export function App() {
           onRename={handleRename}
           onDelete={(session) => void handleDelete(session)}
           onCollapse={() => setSessionsCollapsed(true)}
+          onExpand={() => setSessionsCollapsed(false)}
         />
       </div>
     </div>

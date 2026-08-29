@@ -34,8 +34,6 @@ function useWideLayout() {
 type Props = {
   session: SessionDetail | null;
   draft: SessionDraft;
-  sessionsCollapsed: boolean;
-  onExpandSessions: () => void;
   onDraftChange: (draft: SessionDraft) => void;
   onCreate: () => void;
   onReferenceUploaded: (asset: Asset) => void;
@@ -56,8 +54,6 @@ type Props = {
 export function GenerationWorkspace({
   session,
   draft,
-  sessionsCollapsed,
-  onExpandSessions,
   onDraftChange,
   onCreate,
   onReferenceUploaded,
@@ -144,17 +140,6 @@ export function GenerationWorkspace({
         >
           <MenuIcon class="size-4" />
         </label>
-        {sessionsCollapsed && (
-          <button
-            class="btn border-base-content/10 bg-base-100/80 btn-sm btn-square absolute top-8 left-8 hidden shadow-sm backdrop-blur lg:inline-flex"
-            type="button"
-            aria-label="Expand sessions"
-            title="Sessions"
-            onClick={onExpandSessions}
-          >
-            <MenuIcon class="size-4" />
-          </button>
-        )}
         <section class="relative flex max-w-sm flex-col items-center text-center">
           <div class="empty-canvas-mark mb-8" aria-hidden="true">
             <span class="empty-canvas-focus" />
@@ -186,17 +171,6 @@ export function GenerationWorkspace({
         >
           <MenuIcon class="size-4" />
         </label>
-        {sessionsCollapsed && (
-          <button
-            class="btn border-base-content/10 bg-base-100/85 btn-sm btn-square pointer-events-auto absolute top-4 left-4 hidden shadow-sm backdrop-blur lg:inline-flex xl:top-8 xl:left-8"
-            type="button"
-            aria-label="Expand sessions"
-            title="Sessions"
-            onClick={onExpandSessions}
-          >
-            <MenuIcon class="size-4" />
-          </button>
-        )}
         <button
           class="btn border-base-content/10 bg-base-100/85 btn-sm btn-square pointer-events-auto ml-auto shadow-sm backdrop-blur xl:hidden"
           type="button"
@@ -215,6 +189,19 @@ export function GenerationWorkspace({
             <div class="shrink-0 px-4 pt-18 sm:px-6 lg:px-8 xl:pt-8">
               <PromptPanel
                 draft={draft}
+                settingsControl={
+                  wideLayout && settingsCollapsed ? (
+                    <button
+                      class="btn border-base-content/10 bg-base-100 btn-sm btn-square shadow-sm"
+                      type="button"
+                      aria-label="Expand settings"
+                      title="Expand settings"
+                      onClick={() => setSettingsCollapsed(false)}
+                    >
+                      <SlidersIcon class="size-4" />
+                    </button>
+                  ) : undefined
+                }
                 references={
                   <ReferenceGrid
                     session={session}
@@ -260,18 +247,6 @@ export function GenerationWorkspace({
             aria-label="Close settings"
             onClick={() => setSettingsOpen(false)}
           />
-        )}
-
-        {!outputExpanded && wideLayout && settingsCollapsed && (
-          <button
-            class="btn border-base-content/10 bg-base-100/85 btn-sm btn-square absolute top-8 right-8 z-20 shadow-sm backdrop-blur"
-            type="button"
-            aria-label="Expand settings"
-            title="Settings"
-            onClick={() => setSettingsCollapsed(false)}
-          >
-            <SlidersIcon class="size-4" />
-          </button>
         )}
 
         {!outputExpanded && (!wideLayout || !settingsCollapsed) && (

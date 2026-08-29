@@ -74,6 +74,7 @@ const modifierGroups = [
 export function PromptPanel({
   draft,
   references,
+  settingsControl,
   onDraftChange,
   onGenerate,
   generationBlocked,
@@ -81,6 +82,7 @@ export function PromptPanel({
 }: {
   draft: SessionDraft;
   references: ComponentChildren;
+  settingsControl?: ComponentChildren;
   onDraftChange: (draft: SessionDraft) => void;
   onGenerate: () => void;
   generationBlocked: boolean;
@@ -113,22 +115,27 @@ export function PromptPanel({
 
       {references}
 
-      <textarea
-        class="textarea min-h-36 w-full resize-none rounded-none border-0 bg-transparent px-5 py-5 text-[0.95rem] leading-6 focus:outline-none"
-        aria-label="Image prompt"
-        value={draft.prompt}
-        maxLength={12_000}
-        placeholder="Describe the image you want to generate…"
-        onInput={(event) =>
-          onDraftChange({ ...draft, prompt: event.currentTarget.value })
-        }
-        onKeyDown={(event) => {
-          if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-            event.preventDefault();
-            if (ready) onGenerate();
+      <div class="relative">
+        {settingsControl && (
+          <div class="absolute top-4 right-4 z-10">{settingsControl}</div>
+        )}
+        <textarea
+          class={`textarea min-h-36 w-full resize-none rounded-none border-0 bg-transparent py-5 pl-5 text-[0.95rem] leading-6 focus:outline-none ${settingsControl ? "pr-16" : "pr-5"}`}
+          aria-label="Image prompt"
+          value={draft.prompt}
+          maxLength={12_000}
+          placeholder="Describe the image you want to generate…"
+          onInput={(event) =>
+            onDraftChange({ ...draft, prompt: event.currentTarget.value })
           }
-        }}
-      />
+          onKeyDown={(event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+              event.preventDefault();
+              if (ready) onGenerate();
+            }
+          }}
+        />
+      </div>
 
       {modifierGroups.some((group) => draft.promptModifiers[group.key]) && (
         <div
