@@ -83,7 +83,10 @@ send that cookie when the same instance is reached directly over plain HTTP.
 
 Cross-origin mutation requests are accepted from `PUBLIC_URL` and the complete
 origins in `TRUSTED_ORIGINS`. Entries include scheme and port, for example
-`https://pictogen.example.com` or `https://pictogen.example.com:8443`.
+`https://pictogen.example.com` or `https://pictogen.example.com:8443`. To allow
+access through an alternate LAN hostname without listing every address, Pictogen
+also accepts an origin whose host matches the request host and whose protocol
+matches `PUBLIC_URL`.
 
 ## Commands
 

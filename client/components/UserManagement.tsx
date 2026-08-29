@@ -178,6 +178,9 @@ export function UserManagement({
                 {user.isAdmin && (
                   <span class="badge badge-neutral badge-sm">Admin</span>
                 )}
+                {!user.hasLocalCredentials && (
+                  <span class="badge badge-ghost badge-sm">No password</span>
+                )}
                 {user.id !== currentUserId && (
                   <button
                     class="btn btn-ghost btn-xs"
@@ -192,14 +195,16 @@ export function UserManagement({
                     {resetting === user.id ? "Cancel" : "Set password"}
                   </button>
                 )}
-                <button
-                  class="btn btn-ghost btn-xs"
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void updateAdministrator(user)}
-                >
-                  {user.isAdmin ? "Remove admin" : "Make admin"}
-                </button>
+                {(user.isAdmin || user.hasLocalCredentials) && (
+                  <button
+                    class="btn btn-ghost btn-xs"
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void updateAdministrator(user)}
+                  >
+                    {user.isAdmin ? "Remove admin" : "Make admin"}
+                  </button>
+                )}
                 {user.id !== currentUserId && (
                   <button
                     class="btn btn-ghost btn-xs text-error"

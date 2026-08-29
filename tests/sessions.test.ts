@@ -21,13 +21,14 @@ afterEach(() => {
   }
 });
 
-async function createTestApp() {
+async function createTestApp(extra: NodeJS.ProcessEnv = {}) {
   const dataDir = mkdtempSync(join(tmpdir(), "pictogen-sessions-"));
   temporaryDirectories.push(dataDir);
   const config = parseConfig({
     NODE_ENV: "test",
     OPENROUTER_API_KEY: "test-key",
     ...forwardAuthTestEnvironment,
+    ...extra,
     DATA_DIR: dataDir,
   });
   const database = openDatabase({ databasePath: config.databasePath });
@@ -190,6 +191,51 @@ describe("session API", () => {
         message: "Cross-origin requests are not allowed.",
       },
     });
+
+    await app.close();
+  });
+
+  it("requires the public protocol for same-host origin fallback", async () => {
+    const app = await createTestApp({
+      PUBLIC_URL: "https://pictogen.example",
+      TRUSTED_ORIGINS: "https://trusted.example:8443",
+    });
+
+    const sameProtocol = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      headers: { host: "lan.example", origin: "https://lan.example" },
+      payload: { title: "Allowed by host" },
+    });
+    const wrongProtocol = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      headers: { host: "lan.example", origin: "http://lan.example" },
+      payload: { title: "Blocked by protocol" },
+    });
+    const trustedOrigin = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      headers: {
+        host: "internal.example",
+        origin: "https://trusted.example:8443",
+      },
+      payload: { title: "Allowed explicitly" },
+    });
+    const wrongTrustedPort = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      headers: {
+        host: "internal.example",
+        origin: "https://trusted.example",
+      },
+      payload: { title: "Blocked by port" },
+    });
+
+    expect(sameProtocol.statusCode).toBe(201);
+    expect(wrongProtocol.statusCode).toBe(403);
+    expect(trustedOrigin.statusCode).toBe(201);
+    expect(wrongTrustedPort.statusCode).toBe(403);
 
     await app.close();
   });

@@ -106,7 +106,11 @@ export async function buildApp({
   function isAllowedOrigin(origin: string, request: FastifyRequest) {
     try {
       const parsed = new URL(origin);
-      return allowedOrigins.has(parsed.origin) || parsed.host === request.host;
+      return (
+        allowedOrigins.has(parsed.origin) ||
+        (parsed.host === request.host &&
+          parsed.protocol === config.publicUrl.protocol)
+      );
     } catch {
       return false;
     }
