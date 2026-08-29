@@ -92,6 +92,7 @@ export function GenerationWorkspace({
   const [catalogStale, setCatalogStale] = useState(false);
   const [galleryColumns, setGalleryColumns] = useState(3);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [outputExpanded, setOutputExpanded] = useState(false);
   const wideLayout = useWideLayout();
   const referenceLimitErrors = getReferenceLimitErrors(draft, models);
 
@@ -237,23 +238,25 @@ export function GenerationWorkspace({
 
       <div class="flex min-h-0 grow">
         <div class="flex min-w-0 grow flex-col">
-          <div class="shrink-0 px-3 pt-3 sm:px-4 sm:pt-4">
-            <PromptPanel
-              draft={draft}
-              references={
-                <ReferenceGrid
-                  session={session}
-                  draft={draft}
-                  onReferenceUploaded={onReferenceUploaded}
-                  onReferenceRemoved={onReferenceRemoved}
-                />
-              }
-              onDraftChange={onDraftChange}
-              onGenerate={onGenerate}
-              generationBlocked={referenceLimitErrors.length > 0}
-              generationBlockMessage={referenceLimitErrors[0]}
-            />
-          </div>
+          {!outputExpanded && (
+            <div class="shrink-0 px-3 pt-3 sm:px-4 sm:pt-4">
+              <PromptPanel
+                draft={draft}
+                references={
+                  <ReferenceGrid
+                    session={session}
+                    draft={draft}
+                    onReferenceUploaded={onReferenceUploaded}
+                    onReferenceRemoved={onReferenceRemoved}
+                  />
+                }
+                onDraftChange={onDraftChange}
+                onGenerate={onGenerate}
+                generationBlocked={referenceLimitErrors.length > 0}
+                generationBlockMessage={referenceLimitErrors[0]}
+              />
+            </div>
+          )}
 
           <div class="scroll-pane grow px-3 pb-4 sm:px-4">
             <OutputSection
@@ -267,6 +270,10 @@ export function GenerationWorkspace({
               onAddOutputReference={onAddOutputReference}
               onDismissJob={onDismissJob}
               onClearGenerationLog={onClearGenerationLog}
+              outputExpanded={outputExpanded}
+              onToggleOutputExpanded={() =>
+                setOutputExpanded((expanded) => !expanded)
+              }
             />
           </div>
         </div>
@@ -280,30 +287,32 @@ export function GenerationWorkspace({
           />
         )}
 
-        <aside
-          class={
-            wideLayout
-              ? "border-base-300 w-88 shrink-0 border-l"
-              : `border-base-300 fixed inset-y-0 right-0 z-40 w-88 max-w-[88vw] border-l transition-transform duration-200 ${
-                  settingsOpen ? "translate-x-0" : "translate-x-full"
-                }`
-          }
-          aria-hidden={!wideLayout && !settingsOpen ? "true" : undefined}
-          inert={!wideLayout && !settingsOpen ? true : undefined}
-        >
-          <SettingsSidebar
-            draft={draft}
-            models={models}
-            modelSearch={modelSearch}
-            catalogStale={catalogStale}
-            modelError={modelError}
-            referenceLimitErrors={referenceLimitErrors}
-            onDraftChange={onDraftChange}
-            onModelSearch={setModelSearch}
-            onToggleModel={toggleModel}
-            onClose={() => setSettingsOpen(false)}
-          />
-        </aside>
+        {!outputExpanded && (
+          <aside
+            class={
+              wideLayout
+                ? "border-base-300 w-88 shrink-0 border-l"
+                : `border-base-300 fixed inset-y-0 right-0 z-40 w-88 max-w-[88vw] border-l transition-transform duration-200 ${
+                    settingsOpen ? "translate-x-0" : "translate-x-full"
+                  }`
+            }
+            aria-hidden={!wideLayout && !settingsOpen ? "true" : undefined}
+            inert={!wideLayout && !settingsOpen ? true : undefined}
+          >
+            <SettingsSidebar
+              draft={draft}
+              models={models}
+              modelSearch={modelSearch}
+              catalogStale={catalogStale}
+              modelError={modelError}
+              referenceLimitErrors={referenceLimitErrors}
+              onDraftChange={onDraftChange}
+              onModelSearch={setModelSearch}
+              onToggleModel={toggleModel}
+              onClose={() => setSettingsOpen(false)}
+            />
+          </aside>
+        )}
       </div>
     </main>
   );

@@ -127,6 +127,22 @@ export function GridIcon(props: IconProps) {
   );
 }
 
+export function ExpandIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M8 3H3v5m13-5h5v5M8 21H3v-5m13 5h5v-5" />
+    </Icon>
+  );
+}
+
+export function RestoreSizeIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M9 3v6H3m12-6v6h6M9 21v-6H3m12 6v-6h6" />
+    </Icon>
+  );
+}
+
 export function ImageIcon(props: IconProps) {
   return (
     <Icon {...props}>

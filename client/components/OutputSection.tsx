@@ -7,9 +7,11 @@ import {
   ChevronRightIcon,
   CloseIcon,
   DownloadIcon,
+  ExpandIcon,
   GridIcon,
   ImagePlusIcon,
   RestoreIcon,
+  RestoreSizeIcon,
   TrashIcon,
 } from "./Icons.js";
 
@@ -28,6 +30,8 @@ type Props = {
   onAddOutputReference: (assetId: string) => void;
   onDismissJob: (jobId: string) => void;
   onClearGenerationLog: () => void;
+  outputExpanded: boolean;
+  onToggleOutputExpanded: () => void;
 };
 
 export function OutputSection({
@@ -41,6 +45,8 @@ export function OutputSection({
   onAddOutputReference,
   onDismissJob,
   onClearGenerationLog,
+  outputExpanded,
+  onToggleOutputExpanded,
 }: Props) {
   const [lightboxId, setLightboxId] = useState<string | null>(null);
   const [lightboxControlsVisible, setLightboxControlsVisible] = useState(true);
@@ -179,6 +185,22 @@ export function OutputSection({
           />
           <span class="w-2 text-[0.7rem] tabular-nums">{columns}</span>
         </label>
+        <button
+          class="btn btn-ghost btn-xs btn-square"
+          type="button"
+          aria-label={
+            outputExpanded ? "Show prompt and settings" : "Expand output"
+          }
+          aria-pressed={outputExpanded}
+          title={outputExpanded ? "Show prompt and settings" : "Expand output"}
+          onClick={onToggleOutputExpanded}
+        >
+          {outputExpanded ? (
+            <RestoreSizeIcon class="size-3.5" />
+          ) : (
+            <ExpandIcon class="size-3.5" />
+          )}
+        </button>
       </div>
 
       {galleryItems.length > 0 && (
