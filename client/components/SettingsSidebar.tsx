@@ -19,11 +19,8 @@ type Props = {
 
 const resolutions = ["512", "1K", "2K", "4K"] as const;
 const squareAspectRatio = "1:1" as const;
-const aspectRatioPairs = [
-  ["16:9", "9:16"],
-  ["3:2", "2:3"],
-  ["4:3", "3:4"],
-] as const;
+const landscapeAspectRatios = ["16:9", "3:2", "4:3"] as const;
+const portraitAspectRatios = ["9:16", "2:3", "3:4"] as const;
 
 const optionButton = "btn h-11 border-base-300 bg-base-100 font-medium";
 const optionButtonActive = "btn h-11 btn-primary font-semibold";
@@ -274,9 +271,9 @@ export function SettingsSidebar({
             <legend class="text-base-content/55 mb-2 text-xs font-medium">
               Aspect ratio
             </legend>
-            <div class="grid grid-cols-2 gap-2">
+            <div class="grid grid-cols-4 grid-rows-2 gap-2">
               <button
-                class={`col-span-2 ${
+                class={`row-span-2 h-full ${
                   draft.aspectRatio === squareAspectRatio
                     ? optionButtonActive
                     : optionButton
@@ -290,34 +287,23 @@ export function SettingsSidebar({
                 {squareAspectRatio}
               </button>
 
-              <span
-                class="text-base-content/35 mt-1 text-center text-[0.68rem] font-medium"
-                aria-hidden="true"
-              >
-                Landscape
-              </span>
-              <span
-                class="text-base-content/35 mt-1 text-center text-[0.68rem] font-medium"
-                aria-hidden="true"
-              >
-                Portrait
-              </span>
-
-              {aspectRatioPairs.flat().map((aspectRatio) => (
-                <button
-                  key={aspectRatio}
-                  class={
-                    draft.aspectRatio === aspectRatio
-                      ? optionButtonActive
-                      : optionButton
-                  }
-                  type="button"
-                  aria-pressed={draft.aspectRatio === aspectRatio}
-                  onClick={() => onDraftChange({ ...draft, aspectRatio })}
-                >
-                  {aspectRatio}
-                </button>
-              ))}
+              {[...landscapeAspectRatios, ...portraitAspectRatios].map(
+                (aspectRatio) => (
+                  <button
+                    key={aspectRatio}
+                    class={
+                      draft.aspectRatio === aspectRatio
+                        ? optionButtonActive
+                        : optionButton
+                    }
+                    type="button"
+                    aria-pressed={draft.aspectRatio === aspectRatio}
+                    onClick={() => onDraftChange({ ...draft, aspectRatio })}
+                  >
+                    {aspectRatio}
+                  </button>
+                ),
+              )}
             </div>
           </fieldset>
 
