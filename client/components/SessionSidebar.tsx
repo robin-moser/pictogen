@@ -87,15 +87,13 @@ export function SessionSidebar({
       <div class="flex items-center gap-2.5 px-4 pt-4 pb-3">
         <a class="flex min-w-0 items-center gap-2.5" href="/">
           <img
-            class="size-7 shrink-0"
+            class="size-10 shrink-0"
             src="/logo.svg"
             alt=""
-            width="28"
-            height="28"
+            width="38"
+            height="38"
           />
-          <span class="truncate text-sm font-semibold tracking-tight">
-            Pictogen
-          </span>
+          <span class="text-xl font-semibold">Pictogen</span>
         </a>
         <button
           class="btn btn-ghost btn-sm btn-square ml-auto shrink-0"
