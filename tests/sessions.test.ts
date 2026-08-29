@@ -8,6 +8,10 @@ import { buildApp } from "../server/app.js";
 import { parseConfig } from "../server/config.js";
 import { openDatabase } from "../server/db.js";
 import { createEmptyDraft } from "../shared/contracts.js";
+import {
+  authenticateTestRequests,
+  forwardAuthTestEnvironment,
+} from "./test-auth.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -23,10 +27,11 @@ async function createTestApp() {
   const config = parseConfig({
     NODE_ENV: "test",
     OPENROUTER_API_KEY: "test-key",
+    ...forwardAuthTestEnvironment,
     DATA_DIR: dataDir,
   });
   const database = openDatabase({ databasePath: config.databasePath });
-  const app = await buildApp({ config, database });
+  const app = authenticateTestRequests(await buildApp({ config, database }));
 
   return app;
 }
@@ -42,8 +47,8 @@ describe("session API", () => {
       headers: { "remote-user": "  alice  " },
     });
 
-    expect(localResponse.json()).toEqual({ user: "user" });
-    expect(forwardedResponse.json()).toEqual({ user: "alice" });
+    expect(localResponse.json()).toMatchObject({ user: "user" });
+    expect(forwardedResponse.json()).toMatchObject({ user: "alice" });
 
     await app.close();
   });

@@ -1,13 +1,17 @@
 import { resolve } from "node:path";
 
+import cookie from "@fastify/cookie";
 import helmet from "@fastify/helmet";
 import fastifyStatic from "@fastify/static";
 import multipart from "@fastify/multipart";
+import rateLimit from "@fastify/rate-limit";
 import { TypeBoxValidatorCompiler } from "@fastify/type-provider-typebox";
 import type { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import { Type } from "@sinclair/typebox";
 import Fastify from "fastify";
+import type { FastifyRequest } from "fastify";
 
+import { registerAuthentication } from "./auth.js";
 import type { AppConfig } from "./config.js";
 import type { AppDatabase } from "./db.js";
 import { registerSessionRoutes } from "./routes/sessions.js";
@@ -37,9 +41,15 @@ export async function buildApp({
 }: BuildAppOptions) {
   const app = Fastify({
     logger: config.nodeEnv !== "test",
+    trustProxy: Array.isArray(config.trustProxy)
+      ? [...config.trustProxy]
+      : (config.trustProxy as boolean),
   }).withTypeProvider<TypeBoxTypeProvider>();
 
   app.setValidatorCompiler(TypeBoxValidatorCompiler);
+
+  await app.register(cookie);
+  await app.register(rateLimit, { global: false });
 
   await app.register(multipart, {
     limits: { files: 1, fileSize: config.maxUploadBytes },
@@ -88,6 +98,20 @@ export async function buildApp({
     referrerPolicy: { policy: "no-referrer" },
   });
 
+  const allowedOrigins = new Set([
+    config.publicUrl.origin,
+    ...config.trustedOrigins,
+  ]);
+
+  function isAllowedOrigin(origin: string, request: FastifyRequest) {
+    try {
+      const parsed = new URL(origin);
+      return allowedOrigins.has(parsed.origin) || parsed.host === request.host;
+    } catch {
+      return false;
+    }
+  }
+
   app.addHook("onRequest", (request, reply, done) => {
     if (!["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) {
       done();
@@ -96,7 +120,7 @@ export async function buildApp({
 
     const origin = request.headers.origin;
 
-    if (origin && origin !== config.publicUrl.origin) {
+    if (origin && !isAllowedOrigin(origin, request)) {
       void reply.code(403).send({
         error: {
           code: "ORIGIN_NOT_ALLOWED",
@@ -130,6 +154,9 @@ export async function buildApp({
   );
 
   const assetService = createAssetService(config, database);
+
+  await registerAuthentication(app, config, database, assetService);
+
   const imageProvider = provider ?? createOpenRouterProvider(config);
   const modelCatalog = createModelCatalog(
     imageProvider,

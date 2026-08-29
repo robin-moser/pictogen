@@ -128,11 +128,21 @@ export async function registerSessionRoutes(
     {
       schema: {
         response: {
-          200: Type.Object({ user: Type.String() }),
+          200: Type.Object({
+            id: Type.String(),
+            user: Type.String(),
+            isAdmin: Type.Boolean(),
+            mustChangePassword: Type.Boolean(),
+          }),
         },
       },
     },
-    (request) => ({ user: resolveUser(request) }),
+    (request) => ({
+      id: resolveUser(request),
+      user: request.authUser?.displayName ?? resolveUser(request),
+      isAdmin: request.authUser?.isAdmin ?? false,
+      mustChangePassword: request.authUser?.mustChangePassword ?? false,
+    }),
   );
 
   app.get(

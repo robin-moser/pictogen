@@ -8,6 +8,10 @@ import { buildApp } from "../server/app.js";
 import { parseConfig } from "../server/config.js";
 import { openDatabase } from "../server/db.js";
 import { createOpenRouterProvider } from "../server/providers/openrouter.js";
+import {
+  authenticateTestRequests,
+  forwardAuthTestEnvironment,
+} from "./test-auth.js";
 
 const directories: string[] = [];
 afterEach(() =>
@@ -26,27 +30,30 @@ describe("generation API", () => {
       NODE_ENV: "test",
       DATA_DIR: dataDir,
       OPENROUTER_API_KEY: "test-key",
+      ...forwardAuthTestEnvironment,
     });
-    const app = await buildApp({
-      config,
-      database: openDatabase({ databasePath: config.databasePath }),
-      provider: {
-        id: "test",
-        displayName: "Test",
-        listImageModels: async () => [
-          {
-            providerId: "test",
-            modelId: "image",
-            name: "Image",
-            inputModalities: ["text"],
-          },
-        ],
-        generateImages: async () => ({
-          images: [Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])],
-          usage: { cost: 0.000002 },
-        }),
-      },
-    });
+    const app = authenticateTestRequests(
+      await buildApp({
+        config,
+        database: openDatabase({ databasePath: config.databasePath }),
+        provider: {
+          id: "test",
+          displayName: "Test",
+          listImageModels: async () => [
+            {
+              providerId: "test",
+              modelId: "image",
+              name: "Image",
+              inputModalities: ["text"],
+            },
+          ],
+          generateImages: async () => ({
+            images: [Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])],
+            usage: { cost: 0.000002 },
+          }),
+        },
+      }),
+    );
     const session = await app.inject({
       method: "POST",
       url: "/api/sessions",
@@ -146,27 +153,30 @@ describe("generation API", () => {
       NODE_ENV: "test",
       DATA_DIR: dataDir,
       OPENROUTER_API_KEY: "test-key",
+      ...forwardAuthTestEnvironment,
     });
     const svg = Buffer.from(
       '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><rect width="8" height="8"/></svg>',
     );
-    const app = await buildApp({
-      config,
-      database: openDatabase({ databasePath: config.databasePath }),
-      provider: {
-        id: "test",
-        displayName: "Test",
-        listImageModels: async () => [
-          {
-            providerId: "test",
-            modelId: "image",
-            name: "Image",
-            inputModalities: ["text"],
-          },
-        ],
-        generateImages: async () => ({ images: [svg] }),
-      },
-    });
+    const app = authenticateTestRequests(
+      await buildApp({
+        config,
+        database: openDatabase({ databasePath: config.databasePath }),
+        provider: {
+          id: "test",
+          displayName: "Test",
+          listImageModels: async () => [
+            {
+              providerId: "test",
+              modelId: "image",
+              name: "Image",
+              inputModalities: ["text"],
+            },
+          ],
+          generateImages: async () => ({ images: [svg] }),
+        },
+      }),
+    );
     const session = await app.inject({
       method: "POST",
       url: "/api/sessions",
@@ -252,42 +262,45 @@ describe("generation API", () => {
       NODE_ENV: "test",
       DATA_DIR: dataDir,
       OPENROUTER_API_KEY: "test-key",
+      ...forwardAuthTestEnvironment,
     });
     const generatedRequests: { modelId: string; count: number }[] = [];
     let releaseGeneration: () => void = () => undefined;
     const generationGate = new Promise<void>((resolve) => {
       releaseGeneration = resolve;
     });
-    const app = await buildApp({
-      config,
-      database: openDatabase({ databasePath: config.databasePath }),
-      provider: {
-        id: "test",
-        displayName: "Test",
-        listImageModels: async () => [
-          {
-            providerId: "test",
-            modelId: "first",
-            name: "First",
-            inputModalities: ["text"],
+    const app = authenticateTestRequests(
+      await buildApp({
+        config,
+        database: openDatabase({ databasePath: config.databasePath }),
+        provider: {
+          id: "test",
+          displayName: "Test",
+          listImageModels: async () => [
+            {
+              providerId: "test",
+              modelId: "first",
+              name: "First",
+              inputModalities: ["text"],
+            },
+            {
+              providerId: "test",
+              modelId: "second",
+              name: "Second",
+              inputModalities: ["text"],
+            },
+          ],
+          generateImages: async ({ modelId, count }) => {
+            generatedRequests.push({ modelId, count });
+            await generationGate;
+            return {
+              images: [Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])],
+              usage: { cost: 0.000001 },
+            };
           },
-          {
-            providerId: "test",
-            modelId: "second",
-            name: "Second",
-            inputModalities: ["text"],
-          },
-        ],
-        generateImages: async ({ modelId, count }) => {
-          generatedRequests.push({ modelId, count });
-          await generationGate;
-          return {
-            images: [Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])],
-            usage: { cost: 0.000001 },
-          };
         },
-      },
-    });
+      }),
+    );
     const session = await app.inject({
       method: "POST",
       url: "/api/sessions",
@@ -439,29 +452,32 @@ describe("generation API", () => {
       NODE_ENV: "test",
       DATA_DIR: dataDir,
       OPENROUTER_API_KEY: "test-key",
+      ...forwardAuthTestEnvironment,
     });
-    const app = await buildApp({
-      config,
-      database: openDatabase({ databasePath: config.databasePath }),
-      provider: {
-        id: "test",
-        displayName: "Test",
-        listImageModels: async () => [
-          {
-            providerId: "test",
-            modelId: "qwen",
-            name: "Qwen",
-            inputModalities: ["text"],
-            capabilities: {
-              maxReferenceImages: 1,
-              resolutions: ["1K", "2K"],
-              aspectRatios: ["1:1", "3:2"],
-              qualities: ["low", "medium"],
+    const app = authenticateTestRequests(
+      await buildApp({
+        config,
+        database: openDatabase({ databasePath: config.databasePath }),
+        provider: {
+          id: "test",
+          displayName: "Test",
+          listImageModels: async () => [
+            {
+              providerId: "test",
+              modelId: "qwen",
+              name: "Qwen",
+              inputModalities: ["text"],
+              capabilities: {
+                maxReferenceImages: 1,
+                resolutions: ["1K", "2K"],
+                aspectRatios: ["1:1", "3:2"],
+                qualities: ["low", "medium"],
+              },
             },
-          },
-        ],
-      },
-    });
+          ],
+        },
+      }),
+    );
     const created = await app.inject({
       method: "POST",
       url: "/api/sessions",
@@ -519,27 +535,30 @@ describe("generation API", () => {
       NODE_ENV: "test",
       DATA_DIR: dataDir,
       OPENROUTER_API_KEY: "test-key",
+      ...forwardAuthTestEnvironment,
     });
-    const app = await buildApp({
-      config,
-      database: openDatabase({ databasePath: config.databasePath }),
-      provider: {
-        id: "test",
-        displayName: "Test",
-        listImageModels: async () => [
-          {
-            providerId: "test",
-            modelId: "empty",
-            name: "Empty",
-            inputModalities: ["text"],
-          },
-        ],
-        generateImages: async () => ({
-          images: [],
-          usage: { cost: 0.000003 },
-        }),
-      },
-    });
+    const app = authenticateTestRequests(
+      await buildApp({
+        config,
+        database: openDatabase({ databasePath: config.databasePath }),
+        provider: {
+          id: "test",
+          displayName: "Test",
+          listImageModels: async () => [
+            {
+              providerId: "test",
+              modelId: "empty",
+              name: "Empty",
+              inputModalities: ["text"],
+            },
+          ],
+          generateImages: async () => ({
+            images: [],
+            usage: { cost: 0.000003 },
+          }),
+        },
+      }),
+    );
     const created = await app.inject({
       method: "POST",
       url: "/api/sessions",
@@ -636,7 +655,11 @@ describe("generation API", () => {
 describe("OpenRouter errors", () => {
   it("keeps a safe provider rejection detail", async () => {
     const provider = createOpenRouterProvider(
-      parseConfig({ NODE_ENV: "test", OPENROUTER_API_KEY: "test-key" }),
+      parseConfig({
+        NODE_ENV: "test",
+        OPENROUTER_API_KEY: "test-key",
+        AUTH_MODE: "local",
+      }),
       async () =>
         new Response(
           JSON.stringify({

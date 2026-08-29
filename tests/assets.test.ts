@@ -9,7 +9,11 @@ import { buildApp } from "../server/app.js";
 import { detectImageType } from "../server/services/assets.js";
 import { parseConfig } from "../server/config.js";
 import { openDatabase } from "../server/db.js";
-import { assets } from "../server/db/schema.js";
+import { assets, users } from "../server/db/schema.js";
+import {
+  authenticateTestRequests,
+  forwardAuthTestEnvironment,
+} from "./test-auth.js";
 
 const temporaryDirectories: string[] = [];
 afterEach(() => {
@@ -49,10 +53,11 @@ describe("asset API", () => {
     const config = parseConfig({
       NODE_ENV: "test",
       OPENROUTER_API_KEY: "test-key",
+      ...forwardAuthTestEnvironment,
       DATA_DIR: dataDir,
     });
     const database = openDatabase({ databasePath: config.databasePath });
-    const app = await buildApp({ config, database });
+    const app = authenticateTestRequests(await buildApp({ config, database }));
     const aliceHeaders = { "remote-user": "alice" };
     const created = await app.inject({
       method: "POST",
@@ -118,10 +123,11 @@ describe("asset API", () => {
     const config = parseConfig({
       NODE_ENV: "test",
       OPENROUTER_API_KEY: "test-key",
+      ...forwardAuthTestEnvironment,
       DATA_DIR: dataDir,
     });
     const database = openDatabase({ databasePath: config.databasePath });
-    const app = await buildApp({ config, database });
+    const app = authenticateTestRequests(await buildApp({ config, database }));
     const aliceHeaders = { "remote-user": "alice" };
     const created = await app.inject({
       method: "POST",
@@ -130,12 +136,15 @@ describe("asset API", () => {
       payload: { title: "Shortlist" },
     });
     const sessionId = created.json<{ id: string }>().id;
+    const aliceId = database.orm.select().from(users).get()?.id;
+    expect(aliceId).toBeDefined();
+    if (!aliceId) return;
     const outputId = crypto.randomUUID();
     database.orm
       .insert(assets)
       .values({
         id: outputId,
-        ownerId: "alice",
+        ownerId: aliceId,
         sessionId,
         jobId: null,
         kind: "output",
@@ -178,10 +187,11 @@ describe("asset API", () => {
     const config = parseConfig({
       NODE_ENV: "test",
       OPENROUTER_API_KEY: "test-key",
+      ...forwardAuthTestEnvironment,
       DATA_DIR: dataDir,
     });
     const database = openDatabase({ databasePath: config.databasePath });
-    const app = await buildApp({ config, database });
+    const app = authenticateTestRequests(await buildApp({ config, database }));
     const created = await app.inject({
       method: "POST",
       url: "/api/sessions",

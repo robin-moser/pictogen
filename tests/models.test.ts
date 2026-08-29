@@ -33,7 +33,11 @@ describe("model catalog", () => {
       ),
     );
     const provider = createOpenRouterProvider(
-      parseConfig({ NODE_ENV: "test", OPENROUTER_API_KEY: "test-key" }),
+      parseConfig({
+        NODE_ENV: "test",
+        OPENROUTER_API_KEY: "test-key",
+        AUTH_MODE: "local",
+      }),
       fetchImplementation,
     );
 
@@ -92,7 +96,11 @@ describe("model catalog", () => {
       ),
     );
     const provider = createOpenRouterProvider(
-      parseConfig({ NODE_ENV: "test", OPENROUTER_API_KEY: "test-key" }),
+      parseConfig({
+        NODE_ENV: "test",
+        OPENROUTER_API_KEY: "test-key",
+        AUTH_MODE: "local",
+      }),
       fetchImplementation,
     );
 

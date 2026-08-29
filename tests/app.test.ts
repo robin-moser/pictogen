@@ -7,6 +7,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { buildApp } from "../server/app.js";
 import { parseConfig } from "../server/config.js";
 import { openDatabase } from "../server/db.js";
+import {
+  authenticateTestRequests,
+  forwardAuthTestEnvironment,
+} from "./test-auth.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -23,13 +27,14 @@ describe("application shell", () => {
     const config = parseConfig({
       NODE_ENV: "test",
       OPENROUTER_API_KEY: "test-key",
+      ...forwardAuthTestEnvironment,
       DATA_DIR: dataDir,
     });
     const database = openDatabase({
       databasePath: config.databasePath,
       migrationsFolder: resolve("drizzle"),
     });
-    const app = await buildApp({ config, database });
+    const app = authenticateTestRequests(await buildApp({ config, database }));
 
     const migrationTable = database.sqlite
       .prepare(
@@ -68,10 +73,11 @@ describe("application shell", () => {
     const config = parseConfig({
       NODE_ENV: "test",
       OPENROUTER_API_KEY: "test-key",
+      ...forwardAuthTestEnvironment,
       DATA_DIR: dataDir,
     });
     const database = openDatabase({ databasePath: config.databasePath });
-    const app = await buildApp({ config, database });
+    const app = authenticateTestRequests(await buildApp({ config, database }));
 
     const response = await app.inject({
       method: "GET",
