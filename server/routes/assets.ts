@@ -129,6 +129,30 @@ export function registerAssetRoutes(
     },
   );
 
+  app.get<{ Params: { assetId: string } }>(
+    "/api/assets/:assetId/thumbnail",
+    {
+      schema: {
+        params: AssetParamsSchema,
+        response: { 404: ErrorResponseSchema },
+      },
+    },
+    async (request, reply) => {
+      const asset = assetService.findOwnedAsset(
+        request.params.assetId,
+        resolveUser(request),
+      );
+      if (!asset) return notFound(reply);
+
+      return reply
+        .header("Cache-Control", "private, max-age=31536000, immutable")
+        .type("image/webp")
+        .send(
+          createReadStream(await assetService.thumbnailPath(asset.storagePath)),
+        );
+    },
+  );
+
   app.delete<{ Params: { assetId: string } }>(
     "/api/assets/:assetId",
     {

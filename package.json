@@ -17,6 +17,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
+    "thumbnails:regenerate": "tsx scripts/regenerate-thumbnails.ts",
     "start": "node --env-file-if-exists=.env dist/server/main.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

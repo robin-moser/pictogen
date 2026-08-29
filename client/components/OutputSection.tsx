@@ -461,7 +461,7 @@ function GalleryItem({
           <img
             class={`block size-full object-cover transition duration-300 ${imageLoaded ? "opacity-100 group-hover:scale-[1.03]" : "opacity-0"}`}
             loading="lazy"
-            src={`/api/assets/${encodeURIComponent(output.id)}`}
+            src={`/api/assets/${encodeURIComponent(output.id)}/thumbnail`}
             alt={`Generated image for ${job.modelName}`}
             onLoad={() => setImageLoaded(true)}
           />

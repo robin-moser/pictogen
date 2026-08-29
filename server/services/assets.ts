@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
 
 import { and, eq } from "drizzle-orm";
@@ -98,6 +98,22 @@ async function createImagePlaceholder(
     };
   } catch {
     return { width: null, height: null, blurHash: null };
+  }
+}
+
+async function createThumbnail(bytes: Buffer) {
+  try {
+    return await sharp(bytes, { failOn: "error" })
+      .resize({
+        width: 1000,
+        height: 1000,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 70 })
+      .toBuffer();
+  } catch {
+    return null;
   }
 }
 
@@ -273,13 +289,20 @@ export function createAssetService(config: AppConfig, database: AppDatabase) {
       }
       const id = randomUUID();
       const storagePath = `${id}.${imageType.extension}`;
+      const thumbnailStoragePath = `${id}-thumb.webp`;
       const path = safeAssetPath(config, storagePath);
+      const thumbnailPath = safeAssetPath(config, thumbnailStoragePath);
       const temporaryPath = `${path}.tmp`;
+      const temporaryThumbnailPath = `${thumbnailPath}.tmp`;
       const placeholder = await createImagePlaceholder(bytes);
+      const thumbnail = await createThumbnail(bytes);
       await mkdir(dirname(path), { recursive: true });
       await writeFile(temporaryPath, bytes, { flag: "wx" });
+      if (thumbnail)
+        await writeFile(temporaryThumbnailPath, thumbnail, { flag: "wx" });
       try {
         await rename(temporaryPath, path);
+        if (thumbnail) await rename(temporaryThumbnailPath, thumbnailPath);
         const row = {
           id,
           ownerId,
@@ -300,6 +323,8 @@ export function createAssetService(config: AppConfig, database: AppDatabase) {
         await Promise.all([
           rm(path, { force: true }),
           rm(temporaryPath, { force: true }),
+          rm(thumbnailPath, { force: true }),
+          rm(temporaryThumbnailPath, { force: true }),
         ]);
         throw error;
       }
@@ -307,12 +332,28 @@ export function createAssetService(config: AppConfig, database: AppDatabase) {
     async removeFile(storagePath: string) {
       try {
         await rm(safeAssetPath(config, storagePath), { force: true });
+        await rm(
+          safeAssetPath(config, `${storagePath.split(".")[0]}-thumb.webp`),
+          {
+            force: true,
+          },
+        );
       } catch {
         // Missing or inaccessible files must not restore deleted records.
       }
     },
     assetPath(storagePath: string) {
       return safeAssetPath(config, storagePath);
+    },
+    async thumbnailPath(storagePath: string) {
+      const thumbnailStoragePath = `${storagePath.split(".")[0]}-thumb.webp`;
+      const thumbnailPath = safeAssetPath(config, thumbnailStoragePath);
+      try {
+        await access(thumbnailPath);
+        return thumbnailPath;
+      } catch {
+        return safeAssetPath(config, storagePath);
+      }
     },
   };
 }

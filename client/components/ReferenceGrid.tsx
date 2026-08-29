@@ -125,7 +125,7 @@ export function ReferenceGrid({
               >
                 <img
                   class="border-base-300 rounded-field size-12 border object-cover"
-                  src={`/api/assets/${encodeURIComponent(reference.id)}`}
+                  src={`/api/assets/${encodeURIComponent(reference.id)}${reference.kind === "output" ? "/thumbnail" : ""}`}
                   alt={`Reference image ${index + 1}`}
                 />
               </button>
