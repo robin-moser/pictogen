@@ -8,6 +8,7 @@ import {
   CloseIcon,
   DownloadIcon,
   GridIcon,
+  RestoreIcon,
   TrashIcon,
 } from "./Icons.js";
 
@@ -22,6 +23,7 @@ type Props = {
   busyItemId: string | null;
   onCancelJob: (jobId: string) => void;
   onDeleteOutput: (assetId: string) => void;
+  onRestoreOutput: (run: Run, job: Job) => void;
   onDismissJob: (jobId: string) => void;
   onClearGenerationLog: () => void;
 };
@@ -33,6 +35,7 @@ export function OutputSection({
   busyItemId,
   onCancelJob,
   onDeleteOutput,
+  onRestoreOutput,
   onDismissJob,
   onClearGenerationLog,
 }: Props) {
@@ -181,6 +184,7 @@ export function OutputSection({
               onOpen={setLightboxId}
               onCancel={() => onCancelJob(job.id)}
               onDelete={() => output && onDeleteOutput(output.id)}
+              onRestore={() => onRestoreOutput(run, job)}
             />
           ))}
         </div>
@@ -339,6 +343,7 @@ function GalleryItem({
   onOpen,
   onCancel,
   onDelete,
+  onRestore,
 }: {
   job: Job;
   run: Run;
@@ -350,6 +355,7 @@ function GalleryItem({
   onOpen: (assetId: string) => void;
   onCancel: () => void;
   onDelete: () => void;
+  onRestore: () => void;
 }) {
   const aspectRatio = run.options.aspectRatio.replace(":", " / ");
   const itemId = output?.id ?? job.id;
@@ -414,6 +420,15 @@ function GalleryItem({
         >
           {output ? (
             <>
+              <button
+                class="btn btn-xs btn-square border-white/15 bg-black/60 text-white hover:bg-black"
+                type="button"
+                onClick={onRestore}
+                aria-label={`Restore prompt and references from ${job.modelName}`}
+                title="Restore prompt and references"
+              >
+                <RestoreIcon class="size-3.5" />
+              </button>
               <a
                 class="btn btn-xs btn-square border-white/15 bg-black/60 text-white hover:bg-black"
                 href={`/api/assets/${encodeURIComponent(output.id)}`}

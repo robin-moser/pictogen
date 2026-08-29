@@ -55,6 +55,14 @@ export function DownloadIcon(props: IconProps) {
   );
 }
 
+export function RestoreIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 8V4m0 0h4M4 4l4 4a7 7 0 1 1-2 7" />
+    </Icon>
+  );
+}
+
 export function CloseIcon(props: IconProps) {
   return (
     <Icon {...props}>

@@ -122,6 +122,7 @@ export const GenerationJobSchema = Type.Object(
     costComplete: Type.Boolean(),
     errorMessage: Type.Optional(Type.String()),
     createdAt: Type.String(),
+    referenceAssetIds: Type.Array(Type.String()),
     outputs: Type.Array(AssetSchema),
   },
   { additionalProperties: false },

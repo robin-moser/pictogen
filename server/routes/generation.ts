@@ -431,6 +431,13 @@ export function runDetail(database: AppDatabase, runId: string) {
       costComplete: job.costComplete,
       ...(job.errorMessage ? { errorMessage: job.errorMessage } : {}),
       createdAt: job.createdAt,
+      referenceAssetIds: database.orm
+        .select({ assetId: jobReferences.assetId })
+        .from(jobReferences)
+        .where(eq(jobReferences.jobId, job.id))
+        .orderBy(jobReferences.ordinal)
+        .all()
+        .map((reference) => reference.assetId),
       outputs: database.orm
         .select()
         .from(assets)

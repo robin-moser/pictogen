@@ -25,8 +25,12 @@ export function ReferenceGrid({
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<Asset | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const availableAssets = [
+    ...session.references,
+    ...session.runs.flatMap((run) => run.jobs.flatMap((job) => job.outputs)),
+  ];
   const references = draft.referenceAssetIds
-    .map((id) => session.references.find((reference) => reference.id === id))
+    .map((id) => availableAssets.find((asset) => asset.id === id))
     .filter((reference): reference is Asset => Boolean(reference));
   const full = draft.referenceAssetIds.length >= 20;
 

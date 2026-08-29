@@ -576,37 +576,40 @@ export function App() {
   }
 
   async function handleReferenceRemoved(assetId: string) {
-    try {
-      setError(null);
-      await deleteAsset(assetId);
-      const current = activeSessionRef.current;
-      if (!current) {
-        return true;
-      }
+    const nextDraft = {
+      ...draftRef.current,
+      referenceAssetIds: draftRef.current.referenceAssetIds.filter(
+        (referenceId) => referenceId !== assetId,
+      ),
+    };
+    changeDraft(nextDraft);
+    return true;
+  }
 
-      const nextDraft = {
-        ...draftRef.current,
-        referenceAssetIds: draftRef.current.referenceAssetIds.filter(
-          (referenceId) => referenceId !== assetId,
+  function handleRestoreOutput(
+    run: SessionDetail["runs"][number],
+    job: SessionDetail["runs"][number]["jobs"][number],
+  ) {
+    const session = activeSessionRef.current;
+    if (!session) return;
+    const outputIds = new Set(
+      session.runs.flatMap((currentRun) =>
+        currentRun.jobs.flatMap((currentJob) =>
+          currentJob.outputs.map((output) => output.id),
         ),
-      };
-      const detail = {
-        ...current,
-        references: current.references.filter((asset) => asset.id !== assetId),
-        draft: nextDraft,
-      };
-      activeSessionRef.current = detail;
-      setActiveSession(detail);
-      changeDraft(nextDraft);
-      return true;
-    } catch (deleteError) {
-      setError(
-        deleteError instanceof Error
-          ? deleteError.message
-          : "The reference could not be removed.",
-      );
-      return false;
-    }
+      ),
+    );
+    const availableReferenceIds = new Set([
+      ...session.references.map((reference) => reference.id),
+      ...outputIds,
+    ]);
+    changeDraft({
+      ...draftRef.current,
+      prompt: run.prompt,
+      referenceAssetIds: job.referenceAssetIds.filter((assetId) =>
+        availableReferenceIds.has(assetId),
+      ),
+    });
   }
 
   return (
@@ -649,6 +652,7 @@ export function App() {
           busyItemId={busyItemId}
           onCancelJob={(jobId) => void handleCancelJob(jobId)}
           onDeleteOutput={(assetId) => void handleDeleteOutput(assetId)}
+          onRestoreOutput={handleRestoreOutput}
           onDismissJob={(jobId) => void handleDismissJob(jobId)}
           onClearGenerationLog={() => void handleClearGenerationLog()}
         />
