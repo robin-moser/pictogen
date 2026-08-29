@@ -148,7 +148,7 @@ export function PromptPanel({
           <div class="absolute top-4 right-4 z-10">{settingsControl}</div>
         )}
         <textarea
-          class={`textarea min-h-36 w-full resize-none rounded-none border-0 bg-transparent py-5 pl-5 text-[0.95rem] leading-6 focus:outline-none ${settingsControl ? "pr-16" : "pr-5"}`}
+          class={`textarea min-h-24 w-full resize-none rounded-none border-0 bg-transparent py-5 pl-5 text-[0.95rem] leading-6 focus:outline-none ${settingsControl ? "pr-16" : "pr-5"}`}
           aria-label="Image prompt"
           value={draft.prompt}
           maxLength={12_000}
