@@ -52,6 +52,7 @@ export function OutputSection({
   const [lightboxControlsVisible, setLightboxControlsVisible] = useState(true);
   const [revealedItemId, setRevealedItemId] = useState<string | null>(null);
   const galleryRef = useRef<HTMLDivElement>(null);
+  const masonryRef = useRef<MasonryGrid | null>(null);
 
   const jobs = session.runs.flatMap((run) =>
     run.jobs.map((job) => ({ job, run })),
@@ -99,6 +100,7 @@ export function OutputSection({
       useResizeObserver: true,
       observeChildren: true,
     });
+    masonryRef.current = grid;
     const updateLayout = () => {
       grid.gap = large.matches ? 12 : 8;
       grid.renderItems({ useOrgResize: true });
@@ -112,8 +114,13 @@ export function OutputSection({
       small.removeEventListener("change", updateLayout);
       large.removeEventListener("change", updateLayout);
       grid.destroy();
+      masonryRef.current = null;
     };
   }, [columns, galleryKey]);
+
+  function handleImageLoad() {
+    masonryRef.current?.renderItems({ useOrgResize: true });
+  }
 
   function step(direction: number) {
     if (!lightboxItems.length) return;
@@ -220,6 +227,7 @@ export function OutputSection({
               onDelete={() => output && onDeleteOutput(output.id)}
               onRestore={() => onRestoreOutput(run, job)}
               onAddReference={() => output && onAddOutputReference(output.id)}
+              onImageLoad={handleImageLoad}
             />
           ))}
         </div>
@@ -394,6 +402,7 @@ function GalleryItem({
   onDelete,
   onRestore,
   onAddReference,
+  onImageLoad,
 }: {
   job: Job;
   run: Run;
@@ -407,6 +416,7 @@ function GalleryItem({
   onDelete: () => void;
   onRestore: () => void;
   onAddReference: () => void;
+  onImageLoad: () => void;
 }) {
   const aspectRatio = run.options.aspectRatio.replace(":", " / ");
   const itemId = output?.id ?? job.id;
@@ -440,6 +450,7 @@ function GalleryItem({
             loading="lazy"
             src={`/api/assets/${encodeURIComponent(output.id)}`}
             alt={`Generated image for ${job.modelName}`}
+            onLoad={onImageLoad}
           />
         </button>
       ) : (
