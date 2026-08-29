@@ -73,6 +73,9 @@ describe("asset API", () => {
       sessionId,
       kind: "reference",
       mimeType: "image/jpeg",
+      width: 1200,
+      height: 600,
+      blurHash: expect.any(String),
     });
     const assetId = upload.json<{ id: string }>().id;
 

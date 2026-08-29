@@ -211,13 +211,26 @@ describe("generation API", () => {
         jobs: {
           status: string;
           errorMessage?: string;
-          outputs: { id: string; mimeType: string }[];
+          outputs: {
+            id: string;
+            mimeType: string;
+            width: number | null;
+            height: number | null;
+            blurHash: string | null;
+          }[];
         }[];
       }[];
     }>();
     expect(completed.runs[0]?.jobs[0]).toMatchObject({
       status: "succeeded",
-      outputs: [{ mimeType: "image/svg+xml" }],
+      outputs: [
+        {
+          mimeType: "image/svg+xml",
+          width: 8,
+          height: 8,
+          blurHash: expect.any(String),
+        },
+      ],
     });
     const asset = await app.inject({
       method: "GET",

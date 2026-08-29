@@ -447,6 +447,9 @@ export function runDetail(database: AppDatabase, runId: string) {
           kind: asset.kind,
           mimeType: asset.mimeType,
           bytes: asset.bytes,
+          width: asset.width,
+          height: asset.height,
+          blurHash: asset.blurHash,
           createdAt: asset.createdAt,
         })),
     }));

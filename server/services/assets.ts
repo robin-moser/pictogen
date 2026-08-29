@@ -3,6 +3,7 @@ import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
 
 import { and, eq } from "drizzle-orm";
+import { encode } from "blurhash";
 import decodeHeic from "heic-decode";
 import sharp, { type Sharp } from "sharp";
 
@@ -20,6 +21,7 @@ const imageTypes = {
 
 type ImageType = (typeof imageTypes)[keyof typeof imageTypes];
 type AssetRow = typeof assets.$inferSelect;
+type ImagePlaceholder = Pick<AssetRow, "width" | "height" | "blurHash">;
 
 export class AssetValidationError extends Error {}
 
@@ -66,6 +68,37 @@ async function normalizeReference(bytes: Buffer) {
     .flatten({ background: "#ffffff" })
     .jpeg({ quality: 70 })
     .toBuffer();
+}
+
+async function createImagePlaceholder(
+  bytes: Buffer,
+): Promise<ImagePlaceholder> {
+  try {
+    const metadata = await sharp(bytes, { failOn: "error" }).metadata();
+    const width = metadata.autoOrient.width;
+    const height = metadata.autoOrient.height;
+    const { data, info } = await sharp(bytes, { failOn: "error" })
+      .autoOrient()
+      .resize({ width: 32, height: 32, fit: "inside" })
+      .flatten({ background: "#ffffff" })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    return {
+      width,
+      height,
+      blurHash: encode(
+        new Uint8ClampedArray(data),
+        info.width,
+        info.height,
+        4,
+        3,
+      ),
+    };
+  } catch {
+    return { width: null, height: null, blurHash: null };
+  }
 }
 
 // SVG has no magic number, so the root element is matched after skipping any
@@ -136,6 +169,9 @@ function assetFromRow(row: AssetRow): Asset {
     kind: row.kind,
     mimeType: row.mimeType,
     bytes: row.bytes,
+    width: row.width,
+    height: row.height,
+    blurHash: row.blurHash,
     createdAt: row.createdAt,
   };
 }
@@ -192,6 +228,7 @@ export function createAssetService(config: AppConfig, database: AppDatabase) {
       const storagePath = `${id}.jpg`;
       const path = safeAssetPath(config, storagePath);
       const temporaryPath = `${path}.tmp`;
+      const placeholder = await createImagePlaceholder(normalized);
       await mkdir(dirname(path), { recursive: true });
       await writeFile(temporaryPath, normalized, { flag: "wx" });
 
@@ -207,6 +244,7 @@ export function createAssetService(config: AppConfig, database: AppDatabase) {
           storagePath,
           mimeType: "image/jpeg",
           bytes: normalized.length,
+          ...placeholder,
           ordinal: null,
           createdAt: new Date().toISOString(),
         };
@@ -237,6 +275,7 @@ export function createAssetService(config: AppConfig, database: AppDatabase) {
       const storagePath = `${id}.${imageType.extension}`;
       const path = safeAssetPath(config, storagePath);
       const temporaryPath = `${path}.tmp`;
+      const placeholder = await createImagePlaceholder(bytes);
       await mkdir(dirname(path), { recursive: true });
       await writeFile(temporaryPath, bytes, { flag: "wx" });
       try {
@@ -251,6 +290,7 @@ export function createAssetService(config: AppConfig, database: AppDatabase) {
           storagePath,
           mimeType: imageType.mimeType,
           bytes: bytes.length,
+          ...placeholder,
           ordinal,
           createdAt: new Date().toISOString(),
         };
