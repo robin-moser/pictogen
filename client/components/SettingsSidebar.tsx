@@ -1,3 +1,5 @@
+import { useState } from "preact/hooks";
+
 import type { ImageModel, SessionDraft } from "../../shared/contracts.js";
 import { resolveEffectiveOptions } from "../../shared/capabilities.js";
 import { AlertIcon, CloseIcon, PlusIcon, SearchIcon } from "./Icons.js";
@@ -74,6 +76,23 @@ export function SettingsSidebar({
     ),
   );
   const modelsFull = draft.models.length >= 3;
+  const [hint, setHint] = useState<{
+    text: string;
+    top: number;
+    left: number;
+  } | null>(null);
+
+  function showHint(anchor: HTMLElement, text: string) {
+    const rect = anchor.getBoundingClientRect();
+    setHint({
+      text,
+      left: rect.left - 12,
+      top: Math.min(
+        Math.max(rect.top + rect.height / 2, 72),
+        window.innerHeight - 72,
+      ),
+    });
+  }
 
   function clearOutputOption(
     option: "quality" | "background" | "outputFormat" | "outputCompression",
@@ -177,25 +196,41 @@ export function SettingsSidebar({
               No matching models.
             </p>
           ) : (
-            <ul class="border-base-300 divide-base-300 rounded-field mt-3 max-h-80 divide-y overflow-y-auto border">
+            <ul
+              class="border-base-300 divide-base-300 rounded-field mt-3 max-h-80 divide-y overflow-y-auto border"
+              onScroll={() => setHint(null)}
+              onMouseLeave={() => setHint(null)}
+            >
               {visibleModels.map((model) => (
-                <li key={`${model.providerId}:${model.modelId}`}>
+                <li
+                  key={`${model.providerId}:${model.modelId}`}
+                  onMouseEnter={(event) =>
+                    showHint(
+                      event.currentTarget,
+                      modelsFull
+                        ? "Three models already selected."
+                        : `${model.name}\n${model.providerId} / ${model.modelId}\n${model.description ?? ""}`.trim(),
+                    )
+                  }
+                >
                   <button
                     class="hover:bg-base-300/50 group/model flex w-full items-start gap-2.5 px-3 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-35"
                     type="button"
                     disabled={modelsFull}
-                    title={
-                      modelsFull
-                        ? "Three models already selected"
-                        : (model.description ?? model.modelId)
-                    }
                     onClick={() => onToggleModel(model)}
+                    onFocus={(event) =>
+                      showHint(
+                        event.currentTarget,
+                        `${model.name}\n${model.providerId} / ${model.modelId}\n${model.description ?? ""}`.trim(),
+                      )
+                    }
+                    onBlur={() => setHint(null)}
                   >
                     <span class="min-w-0 grow">
                       <span class="block truncate text-sm font-medium">
                         {model.name}
                       </span>
-                      <span class="text-base-content/45 mt-0.5 block truncate text-xs leading-5 group-hover/model:overflow-visible group-hover/model:whitespace-normal">
+                      <span class="text-base-content/45 mt-0.5 block truncate text-xs leading-5">
                         {model.description ?? model.modelId}
                       </span>
                     </span>
@@ -420,6 +455,20 @@ export function SettingsSidebar({
           </div>
         )}
       </div>
+
+      {hint && (
+        <div
+          class="bg-base-300 border-base-content/10 rounded-field pointer-events-none fixed z-50 max-w-72 border px-3 py-2 text-xs leading-5 whitespace-pre-line shadow-lg"
+          style={{
+            left: `${hint.left}px`,
+            top: `${hint.top}px`,
+            transform: "translate(-100%, -50%)",
+          }}
+          role="tooltip"
+        >
+          {hint.text}
+        </div>
+      )}
     </div>
   );
 }
