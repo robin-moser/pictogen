@@ -43,6 +43,7 @@ export function OutputSection({
   onClearGenerationLog,
 }: Props) {
   const [lightboxId, setLightboxId] = useState<string | null>(null);
+  const [lightboxControlsVisible, setLightboxControlsVisible] = useState(true);
   const [revealedItemId, setRevealedItemId] = useState<string | null>(null);
   const galleryRef = useRef<HTMLDivElement>(null);
 
@@ -113,7 +114,15 @@ export function OutputSection({
     const nextIndex =
       (lightboxIndex + direction + lightboxItems.length) % lightboxItems.length;
     const nextImage = lightboxItems[nextIndex];
-    if (nextImage) setLightboxId(nextImage.output.id);
+    if (nextImage) {
+      setLightboxId(nextImage.output.id);
+      setLightboxControlsVisible(true);
+    }
+  }
+
+  function openLightbox(assetId: string) {
+    setLightboxId(assetId);
+    setLightboxControlsVisible(true);
   }
 
   useEffect(() => {
@@ -184,7 +193,7 @@ export function OutputSection({
               busy={busyItemId === (output?.id ?? job.id)}
               revealed={revealedItemId === (output?.id ?? job.id)}
               onReveal={() => setRevealedItemId(output?.id ?? job.id)}
-              onOpen={setLightboxId}
+              onOpen={openLightbox}
               onCancel={() => onCancelJob(job.id)}
               onDelete={() => output && onDeleteOutput(output.id)}
               onRestore={() => onRestoreOutput(run, job)}
@@ -258,52 +267,66 @@ export function OutputSection({
               class="relative max-h-full max-w-full"
               onClick={(event) => event.stopPropagation()}
             >
-              <img
-                class="block max-h-[88vh] max-w-[92vw] object-contain"
-                src={`/api/assets/${encodeURIComponent(lightboxImage.output.id)}`}
-                alt={`Expanded generated image for ${lightboxImage.job.modelName}`}
-              />
-              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/75 to-transparent px-4 pt-14 pb-4 text-white">
-                <p class="line-clamp-3 text-sm leading-relaxed">
-                  {lightboxImage.run.prompt}
-                </p>
-                <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.7rem] text-white/60">
-                  <span class="text-white/85">
-                    {lightboxImage.job.modelName}
-                  </span>
-                  <span>
-                    {lightboxImage.job.providerId} / {lightboxImage.job.modelId}
-                  </span>
-                  <span>{formatEffectiveOptions(lightboxImage.job)}</span>
-                  <span>{formatCost(lightboxImage.job)}</span>
-                  <time dateTime={lightboxImage.job.createdAt}>
-                    {formatDate(lightboxImage.job.createdAt)}
-                  </time>
-                </div>
-              </div>
-
-              <a
-                class="btn btn-sm btn-square absolute top-2 right-12 border-white/15 bg-black/60 text-white hover:bg-black"
-                href={`/api/assets/${encodeURIComponent(lightboxImage.output.id)}`}
-                download={downloadFilename(
-                  lightboxImage.job,
-                  lightboxImage.output,
-                )}
-                aria-label="Download image"
-              >
-                <DownloadIcon class="size-4" />
-              </a>
               <button
-                class="btn btn-sm btn-square absolute top-2 right-2 border-white/15 bg-black/60 text-white hover:bg-black"
+                class="block cursor-pointer"
                 type="button"
-                onClick={() => setLightboxId(null)}
-                aria-label="Close image"
+                aria-label={`${lightboxControlsVisible ? "Hide" : "Show"} image information and controls`}
+                onClick={() =>
+                  setLightboxControlsVisible((visible) => !visible)
+                }
               >
-                <CloseIcon class="size-4" />
+                <img
+                  class="block max-h-[88vh] max-w-[92vw] object-contain"
+                  src={`/api/assets/${encodeURIComponent(lightboxImage.output.id)}`}
+                  alt={`Expanded generated image for ${lightboxImage.job.modelName}`}
+                />
               </button>
+              {lightboxControlsVisible && (
+                <>
+                  <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/75 to-transparent px-4 pt-14 pb-4 text-white">
+                    <p class="line-clamp-3 text-sm leading-relaxed">
+                      {lightboxImage.run.prompt}
+                    </p>
+                    <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.7rem] text-white/60">
+                      <span class="text-white/85">
+                        {lightboxImage.job.modelName}
+                      </span>
+                      <span>
+                        {lightboxImage.job.providerId} /{" "}
+                        {lightboxImage.job.modelId}
+                      </span>
+                      <span>{formatEffectiveOptions(lightboxImage.job)}</span>
+                      <span>{formatCost(lightboxImage.job)}</span>
+                      <time dateTime={lightboxImage.job.createdAt}>
+                        {formatDate(lightboxImage.job.createdAt)}
+                      </time>
+                    </div>
+                  </div>
+
+                  <a
+                    class="btn btn-sm btn-square absolute top-2 right-12 border-white/15 bg-black/60 text-white hover:bg-black"
+                    href={`/api/assets/${encodeURIComponent(lightboxImage.output.id)}`}
+                    download={downloadFilename(
+                      lightboxImage.job,
+                      lightboxImage.output,
+                    )}
+                    aria-label="Download image"
+                  >
+                    <DownloadIcon class="size-4" />
+                  </a>
+                  <button
+                    class="btn btn-sm btn-square absolute top-2 right-2 border-white/15 bg-black/60 text-white hover:bg-black"
+                    type="button"
+                    onClick={() => setLightboxId(null)}
+                    aria-label="Close image"
+                  >
+                    <CloseIcon class="size-4" />
+                  </button>
+                </>
+              )}
             </div>
 
-            {lightboxItems.length > 1 && (
+            {lightboxControlsVisible && lightboxItems.length > 1 && (
               <>
                 <button
                   class="btn btn-sm btn-circle absolute left-3 border-white/15 bg-black/60 text-white hover:bg-black"
