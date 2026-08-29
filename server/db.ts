@@ -6,6 +6,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 
 import * as schema from "./db/schema.js";
+import { normalizeUsername } from "./identity.js";
 
 export type AppDatabase = ReturnType<typeof openDatabase>;
 
@@ -23,6 +24,11 @@ export function openDatabase({
   const sqlite = new BetterSqlite3(databasePath);
 
   try {
+    sqlite.function(
+      "normalize_username",
+      { deterministic: true },
+      normalizeUsername,
+    );
     sqlite.pragma("journal_mode = WAL");
     sqlite.pragma("foreign_keys = ON");
     sqlite.pragma("busy_timeout = 5000");
