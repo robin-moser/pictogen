@@ -8,6 +8,7 @@ import {
   CloseIcon,
   DownloadIcon,
   GridIcon,
+  ImagePlusIcon,
   RestoreIcon,
   TrashIcon,
 } from "./Icons.js";
@@ -24,6 +25,7 @@ type Props = {
   onCancelJob: (jobId: string) => void;
   onDeleteOutput: (assetId: string) => void;
   onRestoreOutput: (run: Run, job: Job) => void;
+  onAddOutputReference: (assetId: string) => void;
   onDismissJob: (jobId: string) => void;
   onClearGenerationLog: () => void;
 };
@@ -36,6 +38,7 @@ export function OutputSection({
   onCancelJob,
   onDeleteOutput,
   onRestoreOutput,
+  onAddOutputReference,
   onDismissJob,
   onClearGenerationLog,
 }: Props) {
@@ -185,6 +188,7 @@ export function OutputSection({
               onCancel={() => onCancelJob(job.id)}
               onDelete={() => output && onDeleteOutput(output.id)}
               onRestore={() => onRestoreOutput(run, job)}
+              onAddReference={() => output && onAddOutputReference(output.id)}
             />
           ))}
         </div>
@@ -344,6 +348,7 @@ function GalleryItem({
   onCancel,
   onDelete,
   onRestore,
+  onAddReference,
 }: {
   job: Job;
   run: Run;
@@ -356,6 +361,7 @@ function GalleryItem({
   onCancel: () => void;
   onDelete: () => void;
   onRestore: () => void;
+  onAddReference: () => void;
 }) {
   const aspectRatio = run.options.aspectRatio.replace(":", " / ");
   const itemId = output?.id ?? job.id;
@@ -428,6 +434,15 @@ function GalleryItem({
                 title="Restore prompt and references"
               >
                 <RestoreIcon class="size-3.5" />
+              </button>
+              <button
+                class="btn btn-xs btn-square border-white/15 bg-black/60 text-white hover:bg-black"
+                type="button"
+                onClick={onAddReference}
+                aria-label={`Add image from ${job.modelName} to references`}
+                title="Add to references"
+              >
+                <ImagePlusIcon class="size-3.5" />
               </button>
               <a
                 class="btn btn-xs btn-square border-white/15 bg-black/60 text-white hover:bg-black"

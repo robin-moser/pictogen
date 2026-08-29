@@ -612,6 +612,18 @@ export function App() {
     });
   }
 
+  function handleAddOutputReference(assetId: string) {
+    if (draftRef.current.referenceAssetIds.includes(assetId)) return;
+    if (draftRef.current.referenceAssetIds.length >= 20) {
+      setError("A draft can include at most 20 reference images.");
+      return;
+    }
+    changeDraft({
+      ...draftRef.current,
+      referenceAssetIds: [...draftRef.current.referenceAssetIds, assetId],
+    });
+  }
+
   return (
     <div class="drawer lg:drawer-open h-dvh">
       <input
@@ -653,6 +665,7 @@ export function App() {
           onCancelJob={(jobId) => void handleCancelJob(jobId)}
           onDeleteOutput={(assetId) => void handleDeleteOutput(assetId)}
           onRestoreOutput={handleRestoreOutput}
+          onAddOutputReference={handleAddOutputReference}
           onDismissJob={(jobId) => void handleDismissJob(jobId)}
           onClearGenerationLog={() => void handleClearGenerationLog()}
         />

@@ -137,6 +137,16 @@ export function ImageIcon(props: IconProps) {
   );
 }
 
+export function ImagePlusIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="10" r="1.5" />
+      <path d="m4 17 4.5-4.5a2 2 0 0 1 2.8 0L16 17m2-7V4m-3 3h6" />
+    </Icon>
+  );
+}
+
 export function ChevronLeftIcon(props: IconProps) {
   return (
     <Icon {...props}>
