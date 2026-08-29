@@ -1,4 +1,10 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -10,7 +16,11 @@ import { createLoginFailureTracker, setLocalPassword } from "../server/auth.js";
 import { parseConfig } from "../server/config.js";
 import { openDatabase } from "../server/db.js";
 import {
+  assets,
   authSessions,
+  generationJobs,
+  generationRuns,
+  jobReferences,
   localCredentials,
   sessions,
   users,
@@ -41,6 +51,24 @@ async function buildLocalApp(
     AUTH_MODE: "local",
     ADMIN_USERNAME: "owner",
     ADMIN_PASSWORD: adminPassword,
+    PUBLIC_URL: "http://localhost:3000",
+    ...extra,
+    DATA_DIR: dataDir,
+  });
+  const database = openDatabase({ databasePath: config.databasePath });
+  const app = await buildApp({ config, database });
+  return { app, database, dataDir };
+}
+
+async function buildForwardApp(
+  dataDir = dataDirectory(),
+  extra: NodeJS.ProcessEnv = {},
+) {
+  const config = parseConfig({
+    NODE_ENV: "test",
+    OPENROUTER_API_KEY: "test-key",
+    AUTH_MODE: "forward-auth",
+    FORWARD_AUTH_TRUSTED_PROXIES: "127.0.0.1",
     PUBLIC_URL: "http://localhost:3000",
     ...extra,
     DATA_DIR: dataDir,
@@ -269,5 +297,379 @@ describe("local authentication", () => {
       tracker.record(`unknown-${index}`);
     }
     expect(tracker.size).toBe(1_000);
+  });
+
+  it("grants and withdraws administrator access without losing the last administrator", async () => {
+    const { app, database } = await buildLocalApp();
+    const owner = await signIn(app, "owner", adminPassword);
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/users",
+      headers: { cookie: owner.cookie },
+      payload: { username: "artist", password: "artist-password" },
+    });
+    const artistId = created.json<{ id: string }>().id;
+    const artist = await signIn(app, "artist", "artist-password");
+
+    expect(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/api/users",
+          headers: { cookie: artist.cookie },
+        })
+      ).statusCode,
+    ).toBe(403);
+
+    expect(
+      (
+        await app.inject({
+          method: "PATCH",
+          url: `/api/users/${artistId}`,
+          headers: { cookie: owner.cookie },
+          payload: { isAdmin: true },
+        })
+      ).statusCode,
+    ).toBe(204);
+    expect(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/api/users",
+          headers: { cookie: artist.cookie },
+        })
+      ).statusCode,
+    ).toBe(200);
+
+    expect(
+      (
+        await app.inject({
+          method: "PATCH",
+          url: `/api/users/${artistId}`,
+          headers: { cookie: owner.cookie },
+          payload: { isAdmin: false },
+        })
+      ).statusCode,
+    ).toBe(204);
+    expect(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/api/users",
+          headers: { cookie: artist.cookie },
+        })
+      ).statusCode,
+    ).toBe(403);
+
+    const ownerId = database.orm
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.username, "owner"))
+      .get()?.id;
+    expect(ownerId).toBeDefined();
+    if (!ownerId) return;
+    const demotion = await app.inject({
+      method: "PATCH",
+      url: `/api/users/${ownerId}`,
+      headers: { cookie: owner.cookie },
+      payload: { isAdmin: false },
+    });
+    expect(demotion.statusCode).toBe(409);
+    expect(demotion.json()).toMatchObject({
+      error: { code: "LAST_ADMIN_REQUIRED" },
+    });
+
+    const removal = await app.inject({
+      method: "DELETE",
+      url: `/api/users/${ownerId}`,
+      headers: { cookie: owner.cookie },
+    });
+    expect(removal.statusCode).toBe(409);
+    expect(removal.json()).toMatchObject({
+      error: { code: "SELF_REMOVAL_FORBIDDEN" },
+    });
+    await app.close();
+  });
+
+  it("deletes an account's records, sessions, originals, and thumbnails", async () => {
+    const { app, database, dataDir } = await buildLocalApp();
+    const owner = await signIn(app, "owner", adminPassword);
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/users",
+      headers: { cookie: owner.cookie },
+      payload: { username: "artist", password: "artist-password" },
+    });
+    const artistId = created.json<{ id: string }>().id;
+    const artist = await signIn(app, "artist", "artist-password");
+    const session = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      headers: { cookie: artist.cookie },
+      payload: { title: "Owned work" },
+    });
+    const sessionId = session.json<{ id: string }>().id;
+    const now = new Date().toISOString();
+    database.orm
+      .insert(generationRuns)
+      .values({
+        id: "owned-run",
+        sessionId,
+        ownerId: artistId,
+        idempotencyKey: "owned-key",
+        prompt: "prompt",
+        optionsJson: "{}",
+        requestedCount: 1,
+        createdAt: now,
+      })
+      .run();
+    database.orm
+      .insert(generationJobs)
+      .values({
+        id: "owned-job",
+        runId: "owned-run",
+        sessionId,
+        ownerId: artistId,
+        queueOrder: 1,
+        providerId: "provider",
+        modelId: "model",
+        modelName: "Model",
+        effectiveOptionsJson: "{}",
+        requestedCount: 1,
+        completedCount: 1,
+        status: "succeeded",
+        usageJson: "[]",
+        costMicrousd: 1,
+        costComplete: true,
+        errorCode: null,
+        errorMessage: null,
+        hiddenAt: null,
+        startedAt: now,
+        finishedAt: now,
+        createdAt: now,
+      })
+      .run();
+    database.orm
+      .insert(assets)
+      .values({
+        id: "owned-asset",
+        ownerId: artistId,
+        sessionId,
+        jobId: "owned-job",
+        kind: "output",
+        sha256: "hash",
+        storagePath: "owned-output.png",
+        mimeType: "image/png",
+        bytes: 4,
+        width: 1,
+        height: 1,
+        blurHash: null,
+        starred: false,
+        ordinal: 0,
+        createdAt: now,
+      })
+      .run();
+    database.orm
+      .insert(jobReferences)
+      .values({ jobId: "owned-job", assetId: "owned-asset", ordinal: 0 })
+      .run();
+
+    const assetsDirectory = join(dataDir, "assets");
+    const originalPath = join(assetsDirectory, "owned-output.png");
+    const thumbnailPath = join(assetsDirectory, "owned-output-thumb.webp");
+    mkdirSync(assetsDirectory, { recursive: true });
+    writeFileSync(originalPath, "file");
+    writeFileSync(thumbnailPath, "thumbnail");
+
+    expect(
+      (
+        await app.inject({
+          method: "DELETE",
+          url: `/api/users/${artistId}`,
+          headers: { cookie: owner.cookie },
+        })
+      ).statusCode,
+    ).toBe(204);
+    expect(database.orm.select().from(users).all()).toHaveLength(1);
+    expect(database.orm.select().from(localCredentials).all()).toHaveLength(1);
+    expect(database.orm.select().from(authSessions).all()).toHaveLength(1);
+    expect(database.orm.select().from(sessions).all()).toHaveLength(0);
+    expect(database.orm.select().from(assets).all()).toHaveLength(0);
+    expect(database.orm.select().from(generationRuns).all()).toHaveLength(0);
+    expect(database.orm.select().from(generationJobs).all()).toHaveLength(0);
+    expect(database.orm.select().from(jobReferences).all()).toHaveLength(0);
+    expect(existsSync(originalPath)).toBe(false);
+    expect(existsSync(thumbnailPath)).toBe(false);
+    expect(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/api/me",
+          headers: { cookie: artist.cookie },
+        })
+      ).statusCode,
+    ).toBe(401);
+    await app.close();
+  });
+});
+
+describe("ForwardAuth", () => {
+  it("uses one configured header from explicitly trusted direct peers", async () => {
+    const trusted = await buildForwardApp(undefined, {
+      FORWARD_AUTH_USER_HEADER: "X-Authenticated-User",
+      FORWARD_AUTH_TRUSTED_PROXIES: "127.0.0.0/24",
+    });
+    expect(
+      (
+        await trusted.app.inject({
+          method: "GET",
+          url: "/api/me",
+          headers: { "remote-user": "wrong-header" },
+        })
+      ).statusCode,
+    ).toBe(401);
+    const accepted = await trusted.app.inject({
+      method: "GET",
+      url: "/api/me",
+      headers: { "x-authenticated-user": " Alice " },
+    });
+    expect(accepted.statusCode).toBe(200);
+    expect(accepted.json()).toMatchObject({ user: "Alice", isAdmin: false });
+    expect(trusted.database.orm.select().from(users).get()).toMatchObject({
+      username: "alice",
+      isAdmin: false,
+    });
+    expect(
+      (
+        await trusted.app.inject({
+          method: "POST",
+          url: "/api/auth/logout",
+          headers: { "x-authenticated-user": "alice" },
+        })
+      ).statusCode,
+    ).toBe(404);
+    await trusted.app.close();
+
+    const untrusted = await buildForwardApp(undefined, {
+      FORWARD_AUTH_USER_HEADER: "X-Authenticated-User",
+      FORWARD_AUTH_TRUSTED_PROXIES: "10.0.0.0/24",
+    });
+    expect(
+      (
+        await untrusted.app.inject({
+          method: "GET",
+          url: "/api/me",
+          headers: {
+            "x-authenticated-user": "forged",
+            "x-forwarded-for": "10.0.0.10",
+          },
+        })
+      ).statusCode,
+    ).toBe(401);
+    expect(untrusted.database.orm.select().from(users).all()).toHaveLength(0);
+    await untrusted.app.close();
+  });
+
+  it("preserves stable ownership when switching from ForwardAuth to local", async () => {
+    const dataDir = dataDirectory();
+    const forwarded = await buildForwardApp(dataDir);
+    const identity = await forwarded.app.inject({
+      method: "GET",
+      url: "/api/me",
+      headers: { "remote-user": " Bob " },
+    });
+    const userId = identity.json<{ id: string }>().id;
+    const created = await forwarded.app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      headers: { "remote-user": "bob" },
+      payload: { title: "Forwarded work" },
+    });
+    expect(created.statusCode).toBe(201);
+    await forwarded.app.close();
+
+    const local = await buildLocalApp(dataDir, {
+      ADMIN_USERNAME: "BOB",
+      ADMIN_PASSWORD: adminPassword,
+    });
+    const signedIn = await signIn(local.app, "bOb", adminPassword);
+    expect(signedIn.response.statusCode).toBe(200);
+    expect(
+      (
+        await local.app.inject({
+          method: "GET",
+          url: "/api/me",
+          headers: { cookie: signedIn.cookie },
+        })
+      ).json(),
+    ).toMatchObject({ id: userId, user: "Bob" });
+    expect(
+      (
+        await local.app.inject({
+          method: "GET",
+          url: "/api/sessions",
+          headers: { cookie: signedIn.cookie },
+        })
+      ).json(),
+    ).toEqual([expect.objectContaining({ title: "Forwarded work" })]);
+    expect(local.database.orm.select().from(users).all()).toHaveLength(1);
+    await local.app.close();
+  });
+
+  it("ignores cookies, clears local sessions, and preserves ownership after switching", async () => {
+    const dataDir = dataDirectory();
+    const local = await buildLocalApp(dataDir, {
+      ADMIN_USERNAME: "Bob",
+      ADMIN_PASSWORD: adminPassword,
+    });
+    const signedIn = await signIn(local.app, "bob", adminPassword);
+    const userId = local.database.orm
+      .select({ id: users.id })
+      .from(users)
+      .get()?.id;
+    expect(userId).toBeDefined();
+    if (!userId) return;
+    const created = await local.app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      headers: { cookie: signedIn.cookie },
+      payload: { title: "Local work" },
+    });
+    expect(created.statusCode).toBe(201);
+    expect(local.database.orm.select().from(authSessions).all()).toHaveLength(
+      1,
+    );
+    await local.app.close();
+
+    const forwarded = await buildForwardApp(dataDir);
+    expect(
+      forwarded.database.orm.select().from(authSessions).all(),
+    ).toHaveLength(0);
+    expect(
+      (
+        await forwarded.app.inject({
+          method: "GET",
+          url: "/api/me",
+          headers: { cookie: signedIn.cookie },
+        })
+      ).statusCode,
+    ).toBe(401);
+    const accepted = await forwarded.app.inject({
+      method: "GET",
+      url: "/api/me",
+      headers: { cookie: signedIn.cookie, "remote-user": "BOB" },
+    });
+    expect(accepted.json()).toMatchObject({ id: userId, user: "Bob" });
+    expect(
+      (
+        await forwarded.app.inject({
+          method: "GET",
+          url: "/api/sessions",
+          headers: { "remote-user": "bob" },
+        })
+      ).json(),
+    ).toEqual([expect.objectContaining({ title: "Local work" })]);
+    expect(forwarded.database.orm.select().from(users).all()).toHaveLength(1);
+    await forwarded.app.close();
   });
 });
