@@ -19,15 +19,15 @@ type Props = {
 
 const resolutions = ["512", "1K", "2K", "4K"] as const;
 const squareAspectRatio = "1:1" as const;
-// Rendered as two orientation rows with the square notched into the middle.
-// The middle column's labels sit clear of the notch.
+// Two orientation rows with the square notched into the middle. The tiles are
+// tall enough that every centred label clears the notch.
 const orientationAspectRatios = [
-  { ratio: "16:9", align: "" },
-  { ratio: "3:2", align: "items-start pt-1" },
-  { ratio: "4:3", align: "" },
-  { ratio: "9:16", align: "" },
-  { ratio: "2:3", align: "items-end pb-1" },
-  { ratio: "3:4", align: "" },
+  "16:9",
+  "3:2",
+  "4:3",
+  "9:16",
+  "2:3",
+  "3:4",
 ] as const;
 
 const optionButton = "btn border-base-300 bg-base-100 font-medium";
@@ -281,10 +281,10 @@ export function SettingsSidebar({
             </legend>
             <div class="relative">
               <div class="grid grid-cols-3 grid-rows-2 gap-2">
-                {orientationAspectRatios.map(({ ratio, align }) => (
+                {orientationAspectRatios.map((ratio) => (
                   <button
                     key={ratio}
-                    class={`h-12 ${align} ${
+                    class={`h-18 ${
                       draft.aspectRatio === ratio
                         ? optionButtonActive
                         : optionButton
@@ -301,7 +301,7 @@ export function SettingsSidebar({
               </div>
 
               <button
-                class={`ring-base-200 absolute top-1/2 left-1/2 z-10 size-11 -translate-x-1/2 -translate-y-1/2 px-0 text-xs ring-4 ${
+                class={`ring-base-200 absolute top-1/2 left-1/2 z-10 size-11 -translate-x-1/2 -translate-y-1/2 px-0 ring-4 ${
                   draft.aspectRatio === squareAspectRatio
                     ? optionButtonActive
                     : optionButton
