@@ -18,13 +18,9 @@ type Props = {
 };
 
 const resolutions = ["512", "1K", "2K", "4K"] as const;
-// Three vertically centred columns, widest ratios on the left. The middle
-// column carries the square and so sits equally proud above and below.
-const aspectRatioColumns = [
-  ["16:9", "9:16"],
-  ["3:2", "1:1", "2:3"],
-  ["4:3", "3:4"],
-] as const;
+const squareAspectRatio = "1:1" as const;
+const landscapeAspectRatios = ["16:9", "3:2", "4:3"] as const;
+const portraitAspectRatios = ["9:16", "2:3", "3:4"] as const;
 
 const optionButton = "btn border-base-300 bg-base-100 font-medium";
 const optionButtonActive = "btn btn-primary font-semibold";
@@ -275,29 +271,39 @@ export function SettingsSidebar({
             <legend class="text-base-content/55 mb-2 text-xs font-medium">
               Aspect ratio
             </legend>
-            <div class="flex items-center gap-2">
-              {aspectRatioColumns.map((column, columnIndex) => (
-                <div
-                  key={columnIndex}
-                  class="flex min-w-0 flex-1 flex-col gap-2"
-                >
-                  {column.map((aspectRatio) => (
-                    <button
-                      key={aspectRatio}
-                      class={`h-11 w-full ${
-                        draft.aspectRatio === aspectRatio
-                          ? optionButtonActive
-                          : optionButton
-                      }`}
-                      type="button"
-                      aria-pressed={draft.aspectRatio === aspectRatio}
-                      onClick={() => onDraftChange({ ...draft, aspectRatio })}
-                    >
-                      {aspectRatio}
-                    </button>
-                  ))}
-                </div>
-              ))}
+            <div class="grid grid-cols-4 grid-rows-2 gap-2">
+              <button
+                class={`row-span-2 h-full ${
+                  draft.aspectRatio === squareAspectRatio
+                    ? optionButtonActive
+                    : optionButton
+                }`}
+                type="button"
+                aria-pressed={draft.aspectRatio === squareAspectRatio}
+                onClick={() =>
+                  onDraftChange({ ...draft, aspectRatio: squareAspectRatio })
+                }
+              >
+                {squareAspectRatio}
+              </button>
+
+              {[...landscapeAspectRatios, ...portraitAspectRatios].map(
+                (aspectRatio) => (
+                  <button
+                    key={aspectRatio}
+                    class={`h-11 ${
+                      draft.aspectRatio === aspectRatio
+                        ? optionButtonActive
+                        : optionButton
+                    }`}
+                    type="button"
+                    aria-pressed={draft.aspectRatio === aspectRatio}
+                    onClick={() => onDraftChange({ ...draft, aspectRatio })}
+                  >
+                    {aspectRatio}
+                  </button>
+                ),
+              )}
             </div>
           </fieldset>
 
