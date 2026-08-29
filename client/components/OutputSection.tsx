@@ -96,6 +96,7 @@ export function OutputSection({
     const grid = new MasonryGrid(element, {
       align: "stretch",
       column: columns,
+      columnSizeRatio: true,
       gap: large.matches ? 12 : 8,
       useResizeObserver: true,
       observeChildren: true,
@@ -424,6 +425,7 @@ function GalleryItem({
       class="group bg-base-200 border-base-300 focus-within:outline-primary relative overflow-hidden rounded-box border outline-offset-2 focus-within:outline-2"
       data-grid-width={aspectWidth}
       data-grid-height={aspectHeight}
+      style={{ aspectRatio: `${aspectWidth} / ${aspectHeight}` }}
     >
       {output ? (
         <button
