@@ -20,7 +20,8 @@
     "thumbnails:regenerate": "tsx scripts/regenerate-thumbnails.ts",
     "start": "node --env-file-if-exists=.env dist/server/main.js",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "user:set-password": "node --env-file-if-exists=.env dist/scripts/set-password.js"
   },
   "dependencies": {
     "@egjs/grid": "^1.18.0",

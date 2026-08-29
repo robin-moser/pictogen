@@ -11,6 +11,7 @@ COPY tsconfig.json tsconfig.server.json vite.config.ts index.html ./
 COPY public ./public
 COPY client ./client
 COPY server ./server
+COPY scripts ./scripts
 COPY shared ./shared
 COPY drizzle ./drizzle
 

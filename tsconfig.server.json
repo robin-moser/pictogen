@@ -9,5 +9,5 @@
     "types": ["node"],
     "sourceMap": false
   },
-  "include": ["server/**/*.ts", "shared/**/*.ts"]
+  "include": ["server/**/*.ts", "shared/**/*.ts", "scripts/**/*.ts"]
 }
