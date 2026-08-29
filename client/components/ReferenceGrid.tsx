@@ -1,4 +1,4 @@
-import { useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { uploadReference } from "../api.js";
 import type {
   Asset,
@@ -23,11 +23,21 @@ export function ReferenceGrid({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [preview, setPreview] = useState<Asset | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const references = draft.referenceAssetIds
     .map((id) => session.references.find((reference) => reference.id === id))
     .filter((reference): reference is Asset => Boolean(reference));
   const full = draft.referenceAssetIds.length >= 20;
+
+  useEffect(() => {
+    if (!preview) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPreview(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [preview]);
 
   async function addFiles(files: FileList | File[]) {
     if (uploading || !files[0]) return;
@@ -103,11 +113,18 @@ export function ReferenceGrid({
         <ul class="flex min-w-0 grow items-center gap-1.5 overflow-x-auto">
           {references.map((reference, index) => (
             <li key={reference.id} class="group/ref relative shrink-0">
-              <img
-                class="border-base-300 rounded-field size-12 border object-cover"
-                src={`/api/assets/${encodeURIComponent(reference.id)}`}
-                alt={`Reference image ${index + 1}`}
-              />
+              <button
+                class="block cursor-zoom-in"
+                type="button"
+                aria-label={`Preview reference image ${index + 1}`}
+                onClick={() => setPreview(reference)}
+              >
+                <img
+                  class="border-base-300 rounded-field size-12 border object-cover"
+                  src={`/api/assets/${encodeURIComponent(reference.id)}`}
+                  alt={`Reference image ${index + 1}`}
+                />
+              </button>
               <button
                 class="bg-base-100 border-base-300 text-base-content/70 hover:bg-error hover:text-error-content absolute -top-1 -right-1 grid size-4 place-items-center rounded-full border opacity-0 transition group-focus-within/ref:opacity-100 group-hover/ref:opacity-100 max-md:opacity-100"
                 type="button"
@@ -145,6 +162,36 @@ export function ReferenceGrid({
       </div>
 
       {uploadError && <p class="text-error px-3 pb-2 text-xs">{uploadError}</p>}
+
+      {preview && (
+        <dialog
+          open
+          class="modal modal-open bg-black/85"
+          aria-label="Reference image preview"
+          onClick={() => setPreview(null)}
+        >
+          <div class="relative flex h-dvh w-screen items-center justify-center p-4">
+            <div
+              class="relative max-h-full max-w-full"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <img
+                class="block max-h-[92vh] max-w-[92vw] object-contain"
+                src={`/api/assets/${encodeURIComponent(preview.id)}`}
+                alt="Expanded reference image"
+              />
+              <button
+                class="btn btn-sm btn-square absolute top-2 right-2 border-white/15 bg-black/60 text-white hover:bg-black"
+                type="button"
+                onClick={() => setPreview(null)}
+                aria-label="Close reference image"
+              >
+                <CloseIcon class="size-4" />
+              </button>
+            </div>
+          </div>
+        </dialog>
+      )}
     </section>
   );
 }
