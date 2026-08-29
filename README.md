@@ -4,6 +4,9 @@ Pictogen is a self-hosted, multi-user workspace for AI image generation.
 Create images from text and references, compare models, track actual costs,
 and return to named sessions from any browser.
 
+<img width="1600" height="915" alt="screenshot-pictogen"
+    src="https://raw.githubusercontent.com/robin-moser/pictogen/refs/heads/main/public/screenshot.webp" />
+
 ## Development
 
 The project requires Node.js 24. Install dependencies, create a `.env` file from
