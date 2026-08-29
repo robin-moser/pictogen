@@ -116,8 +116,14 @@ export function registerAssetRoutes(
         return notFound(reply);
       }
 
+      // SVG assets render as documents when opened directly, so serve every
+      // asset under a policy that blocks scripts and outbound requests.
       return reply
         .header("Cache-Control", "private")
+        .header(
+          "Content-Security-Policy",
+          "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox",
+        )
         .type(asset.mimeType)
         .send(createReadStream(assetService.assetPath(asset.storagePath)));
     },

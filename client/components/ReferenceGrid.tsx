@@ -118,7 +118,7 @@ export function ReferenceGrid({
           {references.map((reference, index) => (
             <li key={reference.id} class="group/ref relative shrink-0">
               <button
-                class="block cursor-zoom-in"
+                class="block cursor-pointer"
                 type="button"
                 aria-label={`Preview reference image ${index + 1}`}
                 onClick={() => setPreview(reference)}

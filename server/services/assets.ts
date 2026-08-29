@@ -15,6 +15,7 @@ const imageTypes = {
   png: { mimeType: "image/png", extension: "png" },
   jpeg: { mimeType: "image/jpeg", extension: "jpg" },
   webp: { mimeType: "image/webp", extension: "webp" },
+  svg: { mimeType: "image/svg+xml", extension: "svg" },
 } as const;
 
 type ImageType = (typeof imageTypes)[keyof typeof imageTypes];
@@ -67,6 +68,28 @@ async function normalizeReference(bytes: Buffer) {
     .toBuffer();
 }
 
+// SVG has no magic number, so the root element is matched after skipping any
+// byte-order mark, XML declaration, comments, and doctype.
+const svgPrologue = [
+  /^\s+/,
+  /^<\?[\s\S]*?\?>/,
+  /^<!--[\s\S]*?-->/,
+  /^<!DOCTYPE[\s\S]*?>/i,
+];
+
+function isSvg(bytes: Buffer) {
+  let head = bytes
+    .subarray(0, 4096)
+    .toString("utf8")
+    .replace(/^\uFEFF/, "");
+  for (let step = 0; step < 16; step += 1) {
+    const pattern = svgPrologue.find((candidate) => candidate.test(head));
+    if (!pattern) break;
+    head = head.replace(pattern, "");
+  }
+  return /^<svg[\s/>]/i.test(head);
+}
+
 export function detectImageType(bytes: Buffer): ImageType | null {
   if (
     bytes.length >= 8 &&
@@ -92,7 +115,18 @@ export function detectImageType(bytes: Buffer): ImageType | null {
     return imageTypes.webp;
   }
 
+  if (isSvg(bytes)) {
+    return imageTypes.svg;
+  }
+
   return null;
+}
+
+// The provider decides the format, so name what arrived instead of leaving the
+// unsupported response to guesswork.
+function describeSignature(bytes: Buffer) {
+  if (!bytes.length) return "empty response";
+  return `starts with ${bytes.subarray(0, 8).toString("hex")}`;
 }
 
 function assetFromRow(row: AssetRow): Asset {
@@ -196,7 +230,7 @@ export function createAssetService(config: AppConfig, database: AppDatabase) {
       const imageType = detectImageType(bytes);
       if (!imageType) {
         throw new AssetValidationError(
-          "The provider returned an unsupported image.",
+          `The provider returned an unsupported image (${describeSignature(bytes)}).`,
         );
       }
       const id = randomUUID();

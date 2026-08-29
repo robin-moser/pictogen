@@ -37,7 +37,7 @@ export const assets = sqliteTable(
     sha256: text("sha256").notNull(),
     storagePath: text("storage_path").notNull(),
     mimeType: text("mime_type", {
-      enum: ["image/png", "image/jpeg", "image/webp"],
+      enum: ["image/png", "image/jpeg", "image/webp", "image/svg+xml"],
     }).notNull(),
     bytes: integer("bytes").notNull(),
     ordinal: integer("ordinal"),

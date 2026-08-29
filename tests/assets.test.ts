@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import sharp from "sharp";
 
 import { buildApp } from "../server/app.js";
+import { detectImageType } from "../server/services/assets.js";
 import { parseConfig } from "../server/config.js";
 import { openDatabase } from "../server/db.js";
 
@@ -139,5 +140,35 @@ describe("asset API", () => {
       },
     });
     await app.close();
+  });
+});
+
+describe("detectImageType", () => {
+  it("recognises SVG behind a byte-order mark, declaration, comment, or doctype", () => {
+    const documents = [
+      "<svg xmlns='http://www.w3.org/2000/svg'/>",
+      "\uFEFF<svg viewBox='0 0 1 1'></svg>",
+      "\n  <?xml version='1.0'?>\n<svg></svg>",
+      "<!-- a > inside a comment --><svg></svg>",
+      "<?xml version='1.0'?><!DOCTYPE svg PUBLIC '-//W3C//DTD SVG 1.1//EN' 'svg11.dtd'><svg></svg>",
+    ];
+    for (const document of documents) {
+      expect(detectImageType(Buffer.from(document))).toEqual({
+        mimeType: "image/svg+xml",
+        extension: "svg",
+      });
+    }
+  });
+
+  it("rejects markup that only mentions SVG", () => {
+    const documents = [
+      "<html><body><svg></svg></body></html>",
+      "not an image",
+      "<svgx></svgx>",
+      "",
+    ];
+    for (const document of documents) {
+      expect(detectImageType(Buffer.from(document))).toBeNull();
+    }
   });
 });

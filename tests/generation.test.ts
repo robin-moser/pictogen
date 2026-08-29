@@ -139,6 +139,99 @@ describe("generation API", () => {
     await app.close();
   });
 
+  it("stores an SVG output and serves it under a locked-down policy", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "pictogen-generation-"));
+    directories.push(dataDir);
+    const config = parseConfig({
+      NODE_ENV: "test",
+      DATA_DIR: dataDir,
+      OPENROUTER_API_KEY: "test-key",
+    });
+    const svg = Buffer.from(
+      '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><rect width="8" height="8"/></svg>',
+    );
+    const app = await buildApp({
+      config,
+      database: openDatabase({ databasePath: config.databasePath }),
+      provider: {
+        id: "test",
+        displayName: "Test",
+        listImageModels: async () => [
+          {
+            providerId: "test",
+            modelId: "image",
+            name: "Image",
+            inputModalities: ["text"],
+          },
+        ],
+        generateImages: async () => ({ images: [svg] }),
+      },
+    });
+    const session = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      payload: { title: "Test" },
+    });
+    const sessionId = session.json<{ id: string }>().id;
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/api/sessions/${sessionId}/runs`,
+          headers: { "idempotency-key": "svg-run" },
+          payload: {
+            prompt: "A vector image",
+            models: [{ providerId: "test", modelId: "image" }],
+            count: 1,
+            options: { resolution: "1K", aspectRatio: "1:1" },
+            referenceAssetIds: [],
+          },
+        })
+      ).statusCode,
+    ).toBe(202);
+    app.generationWorker.start();
+    let detail = await app.inject({
+      method: "GET",
+      url: `/api/sessions/${sessionId}`,
+    });
+    for (let attempts = 0; attempts < 20; attempts += 1) {
+      detail = await app.inject({
+        method: "GET",
+        url: `/api/sessions/${sessionId}`,
+      });
+      if (
+        detail.json<{ runs: { jobs: { status: string }[] }[] }>().runs[0]
+          ?.jobs[0]?.status === "succeeded"
+      )
+        break;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    const completed = detail.json<{
+      runs: {
+        jobs: {
+          status: string;
+          errorMessage?: string;
+          outputs: { id: string; mimeType: string }[];
+        }[];
+      }[];
+    }>();
+    expect(completed.runs[0]?.jobs[0]).toMatchObject({
+      status: "succeeded",
+      outputs: [{ mimeType: "image/svg+xml" }],
+    });
+    const asset = await app.inject({
+      method: "GET",
+      url: `/api/assets/${completed.runs[0]?.jobs[0]?.outputs[0]?.id}`,
+    });
+    expect(asset.statusCode).toBe(200);
+    expect(asset.headers["content-type"]).toContain("image/svg+xml");
+    expect(asset.headers["content-security-policy"]).toBe(
+      "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox",
+    );
+    expect(asset.rawPayload.equals(svg)).toBe(true);
+    await app.close();
+  });
+
   it("creates one request per image and cancels only owned queued jobs", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "pictogen-generation-"));
     directories.push(dataDir);

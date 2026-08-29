@@ -561,6 +561,7 @@ function downloadFilename(job: Job, output: Output) {
     "image/png": "png",
     "image/jpeg": "jpg",
     "image/webp": "webp",
+    "image/svg+xml": "svg",
   }[output.mimeType];
   const model = job.modelName
     .toLowerCase()
