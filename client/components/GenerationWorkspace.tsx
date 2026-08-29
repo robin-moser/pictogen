@@ -274,8 +274,8 @@ export function GenerationWorkspace({
         <aside
           class={
             wideLayout
-              ? "border-base-300 w-80 shrink-0 border-l"
-              : `border-base-300 fixed inset-y-0 right-0 z-40 w-80 max-w-[85vw] border-l transition-transform duration-200 ${
+              ? "border-base-300 w-88 shrink-0 border-l"
+              : `border-base-300 fixed inset-y-0 right-0 z-40 w-88 max-w-[88vw] border-l transition-transform duration-200 ${
                   settingsOpen ? "translate-x-0" : "translate-x-full"
                 }`
           }

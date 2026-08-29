@@ -26,6 +26,9 @@ const aspectRatios = [
   "2:3",
 ] as const;
 
+const optionButton = "btn h-11 border-base-300 bg-base-100 font-medium";
+const optionButtonActive = "btn h-11 btn-primary font-semibold";
+
 export function SettingsSidebar({
   draft,
   models,
@@ -98,12 +101,12 @@ export function SettingsSidebar({
       class="bg-base-200 flex h-full min-h-0 flex-col"
       aria-labelledby="settings-heading"
     >
-      <div class="border-base-300 flex shrink-0 items-center justify-between border-b px-4 py-3">
+      <div class="border-base-300 flex shrink-0 items-center justify-between border-b px-5 py-4">
         <h2 id="settings-heading" class="text-sm font-semibold tracking-tight">
           Settings
         </h2>
         <button
-          class="btn btn-ghost btn-xs btn-square xl:hidden"
+          class="btn btn-ghost btn-sm btn-square xl:hidden"
           type="button"
           aria-label="Close settings"
           onClick={onClose}
@@ -112,9 +115,9 @@ export function SettingsSidebar({
         </button>
       </div>
 
-      <div class="scroll-pane grow px-4 py-4">
+      <div class="scroll-pane grow px-5 py-6">
         <section aria-labelledby="models-heading">
-          <div class="flex items-baseline justify-between gap-3">
+          <div class="mb-3 flex items-baseline justify-between gap-3">
             <h3 id="models-heading" class="field-legend">
               Models
             </h3>
@@ -124,37 +127,37 @@ export function SettingsSidebar({
           </div>
 
           {selectedModels.length > 0 && (
-            <ul class="mt-2.5 flex flex-col gap-1" aria-label="Selected models">
+            <ul class="mb-3 flex flex-col gap-2" aria-label="Selected models">
               {selectedModels.map((model) => (
                 <li
                   key={`${model.providerId}:${model.modelId}`}
-                  class="bg-base-100 border-base-300 rounded-field flex items-center gap-2 border py-1.5 pr-1.5 pl-2.5"
+                  class="bg-base-100 border-base-300 rounded-field flex min-h-11 items-center gap-2.5 border py-2 pr-2 pl-3"
                 >
                   <span class="bg-primary size-1.5 shrink-0 rounded-full" />
                   <span class="min-w-0 grow">
-                    <span class="block truncate text-xs font-medium">
+                    <span class="block truncate text-sm font-medium">
                       {model.name}
                     </span>
-                    <span class="text-base-content/40 block truncate text-[0.68rem]">
+                    <span class="text-base-content/40 block truncate text-xs">
                       {model.modelId}
                     </span>
                   </span>
                   <button
-                    class="btn btn-ghost btn-xs btn-square shrink-0"
+                    class="btn btn-ghost btn-sm btn-square shrink-0"
                     type="button"
                     onClick={() => onToggleModel(model)}
                     aria-label={`Remove ${model.name}`}
                     title="Remove"
                   >
-                    <CloseIcon class="size-3.5" />
+                    <CloseIcon class="size-4" />
                   </button>
                 </li>
               ))}
             </ul>
           )}
 
-          <label class="input input-sm mt-2.5 w-full">
-            <SearchIcon class="text-base-content/35 size-3.5" />
+          <label class="input h-11 w-full">
+            <SearchIcon class="text-base-content/35 size-4" />
             <input
               type="search"
               value={modelSearch}
@@ -165,36 +168,38 @@ export function SettingsSidebar({
           </label>
 
           {catalogStale && (
-            <p class="text-warning mt-2 text-xs">Showing a cached catalog.</p>
+            <p class="text-warning mt-2.5 text-xs">Showing a cached catalog.</p>
           )}
-          {modelError && <p class="text-error mt-2 text-xs">{modelError}</p>}
+          {modelError && <p class="text-error mt-2.5 text-xs">{modelError}</p>}
 
           {visibleModels.length === 0 ? (
-            <p class="text-base-content/40 mt-2.5 px-1 py-3 text-xs">
+            <p class="text-base-content/40 mt-3 px-1 py-4 text-xs">
               No matching models.
             </p>
           ) : (
-            <ul class="border-base-300 rounded-field mt-2.5 max-h-64 divide-y divide-base-300 overflow-y-auto border">
+            <ul class="border-base-300 divide-base-300 rounded-field mt-3 max-h-80 divide-y overflow-y-auto border">
               {visibleModels.map((model) => (
                 <li key={`${model.providerId}:${model.modelId}`}>
                   <button
-                    class="hover:bg-base-300/50 group/model flex w-full items-center gap-2 px-2.5 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-35"
+                    class="hover:bg-base-300/50 group/model flex w-full items-start gap-2.5 px-3 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-35"
                     type="button"
                     disabled={modelsFull}
                     title={
-                      modelsFull ? "Three models already selected" : undefined
+                      modelsFull
+                        ? "Three models already selected"
+                        : (model.description ?? model.modelId)
                     }
                     onClick={() => onToggleModel(model)}
                   >
                     <span class="min-w-0 grow">
-                      <span class="block truncate text-xs font-medium">
+                      <span class="block truncate text-sm font-medium">
                         {model.name}
                       </span>
-                      <span class="text-base-content/40 block truncate text-[0.68rem]">
+                      <span class="text-base-content/45 mt-0.5 block truncate text-xs leading-5 group-hover/model:overflow-visible group-hover/model:whitespace-normal">
                         {model.description ?? model.modelId}
                       </span>
                     </span>
-                    <PlusIcon class="text-base-content/30 group-hover/model:text-primary size-3.5 shrink-0 transition-colors" />
+                    <PlusIcon class="text-base-content/30 group-hover/model:text-base-content mt-0.5 size-4 shrink-0 transition-colors" />
                   </button>
                 </li>
               ))}
@@ -203,26 +208,26 @@ export function SettingsSidebar({
         </section>
 
         <section
-          class="border-base-300 mt-6 border-t pt-4"
+          class="border-base-300 mt-8 border-t pt-6"
           aria-labelledby="generation-heading"
         >
           <h3 id="generation-heading" class="field-legend">
             Generation
           </h3>
 
-          <fieldset class="mt-3">
-            <legend class="text-base-content/60 mb-1.5 text-xs font-medium">
+          <fieldset class="mt-4">
+            <legend class="text-base-content/55 mb-2 text-xs font-medium">
               Resolution
             </legend>
-            <div class="join w-full">
+            <div class="grid grid-cols-4 gap-2">
               {resolutions.map((resolution) => (
                 <button
                   key={resolution}
-                  class={`btn btn-xs join-item flex-1 ${
+                  class={
                     draft.resolution === resolution
-                      ? "btn-primary"
-                      : "bg-base-100"
-                  }`}
+                      ? optionButtonActive
+                      : optionButton
+                  }
                   type="button"
                   aria-pressed={draft.resolution === resolution}
                   onClick={() => onDraftChange({ ...draft, resolution })}
@@ -233,19 +238,19 @@ export function SettingsSidebar({
             </div>
           </fieldset>
 
-          <fieldset class="mt-3.5">
-            <legend class="text-base-content/60 mb-1.5 text-xs font-medium">
+          <fieldset class="mt-5">
+            <legend class="text-base-content/55 mb-2 text-xs font-medium">
               Aspect ratio
             </legend>
-            <div class="grid grid-cols-4 gap-1">
+            <div class="grid grid-cols-3 gap-2">
               {aspectRatios.map((aspectRatio) => (
                 <button
                   key={aspectRatio}
-                  class={`btn btn-xs ${
+                  class={
                     draft.aspectRatio === aspectRatio
-                      ? "btn-primary"
-                      : "bg-base-100"
-                  }`}
+                      ? optionButtonActive
+                      : optionButton
+                  }
                   type="button"
                   aria-pressed={draft.aspectRatio === aspectRatio}
                   onClick={() => onDraftChange({ ...draft, aspectRatio })}
@@ -256,13 +261,13 @@ export function SettingsSidebar({
             </div>
           </fieldset>
 
-          <fieldset class="mt-3.5">
-            <legend class="text-base-content/60 mb-1.5 text-xs font-medium">
+          <fieldset class="mt-5">
+            <legend class="text-base-content/55 mb-2 text-xs font-medium">
               Images per model
             </legend>
-            <div class="join flex w-full">
+            <div class="flex items-stretch gap-2">
               <button
-                class="btn btn-xs join-item bg-base-100"
+                class="btn border-base-300 bg-base-100 h-11 w-14 shrink-0 text-lg"
                 type="button"
                 disabled={draft.count <= 1}
                 onClick={() =>
@@ -273,13 +278,13 @@ export function SettingsSidebar({
                 −
               </button>
               <output
-                class="bg-base-100 border-base-300 join-item flex min-w-0 grow items-center justify-center border-y text-xs font-medium tabular-nums"
+                class="bg-base-100 border-base-300 rounded-field flex h-11 min-w-0 grow items-center justify-center border text-sm font-semibold tabular-nums"
                 aria-live="polite"
               >
                 {draft.count}
               </output>
               <button
-                class="btn btn-xs join-item bg-base-100"
+                class="btn border-base-300 bg-base-100 h-11 w-14 shrink-0 text-lg"
                 type="button"
                 disabled={draft.count >= 10}
                 onClick={() =>
@@ -293,17 +298,17 @@ export function SettingsSidebar({
           </fieldset>
         </section>
 
-        <details class="border-base-300 mt-6 border-t">
-          <summary class="text-base-content/60 hover:text-base-content marker:text-base-content/30 cursor-pointer py-3 text-xs font-semibold tracking-[0.06em] uppercase transition-colors">
+        <details class="border-base-300 mt-8 border-t">
+          <summary class="field-legend hover:text-base-content/70 marker:text-base-content/30 cursor-pointer py-4 transition-colors">
             Output
           </summary>
-          <div class="grid gap-3 pb-2">
-            <label class="grid gap-1.5">
-              <span class="text-base-content/60 text-xs font-medium">
+          <div class="grid gap-4 pb-2">
+            <label class="grid gap-2">
+              <span class="text-base-content/55 text-xs font-medium">
                 Quality
               </span>
               <select
-                class="select select-xs bg-base-100 w-full"
+                class="select border-base-300 bg-base-100 h-11 w-full"
                 value={draft.quality ?? ""}
                 onChange={(event) =>
                   event.currentTarget.value
@@ -324,12 +329,12 @@ export function SettingsSidebar({
               </select>
             </label>
 
-            <label class="grid gap-1.5">
-              <span class="text-base-content/60 text-xs font-medium">
+            <label class="grid gap-2">
+              <span class="text-base-content/55 text-xs font-medium">
                 Background
               </span>
               <select
-                class="select select-xs bg-base-100 w-full"
+                class="select border-base-300 bg-base-100 h-11 w-full"
                 value={draft.background ?? ""}
                 onChange={(event) =>
                   event.currentTarget.value
@@ -349,12 +354,12 @@ export function SettingsSidebar({
               </select>
             </label>
 
-            <label class="grid gap-1.5">
-              <span class="text-base-content/60 text-xs font-medium">
+            <label class="grid gap-2">
+              <span class="text-base-content/55 text-xs font-medium">
                 File format
               </span>
               <select
-                class="select select-xs bg-base-100 w-full"
+                class="select border-base-300 bg-base-100 h-11 w-full"
                 value={draft.outputFormat ?? ""}
                 onChange={(event) =>
                   event.currentTarget.value
@@ -374,12 +379,12 @@ export function SettingsSidebar({
               </select>
             </label>
 
-            <label class="grid gap-1.5">
-              <span class="text-base-content/60 text-xs font-medium">
+            <label class="grid gap-2">
+              <span class="text-base-content/55 text-xs font-medium">
                 Compression
               </span>
               <input
-                class="input input-xs bg-base-100 w-full"
+                class="input border-base-300 bg-base-100 h-11 w-full"
                 type="number"
                 min="0"
                 max="100"
@@ -402,8 +407,8 @@ export function SettingsSidebar({
         </details>
 
         {(referenceLimitErrors.length > 0 || capabilityWarnings.length > 0) && (
-          <div class="bg-warning/10 text-warning rounded-field mt-5 flex gap-2 p-2.5 text-xs leading-5">
-            <AlertIcon class="mt-0.5 size-3.5 shrink-0" />
+          <div class="bg-warning/10 text-warning rounded-field mt-6 flex gap-2.5 p-3 text-xs leading-5">
+            <AlertIcon class="mt-0.5 size-4 shrink-0" />
             <div class="min-w-0">
               {referenceLimitErrors.map((message) => (
                 <p key={message}>{message}</p>

@@ -10,26 +10,26 @@
   prefersdark: true;
   color-scheme: dark;
 
-  --color-base-100: oklch(17% 0.008 252);
-  --color-base-200: oklch(21% 0.01 252);
-  --color-base-300: oklch(27.5% 0.013 252);
-  --color-base-content: oklch(92% 0.006 252);
-  --color-primary: oklch(74% 0.112 206);
-  --color-primary-content: oklch(19% 0.035 206);
-  --color-secondary: oklch(70% 0.055 252);
-  --color-secondary-content: oklch(19% 0.02 252);
-  --color-accent: oklch(76% 0.085 182);
-  --color-accent-content: oklch(19% 0.03 182);
-  --color-neutral: oklch(27.5% 0.013 252);
-  --color-neutral-content: oklch(92% 0.006 252);
-  --color-info: oklch(74% 0.095 232);
-  --color-info-content: oklch(19% 0.035 232);
-  --color-success: oklch(74% 0.115 158);
-  --color-success-content: oklch(19% 0.035 158);
-  --color-warning: oklch(80% 0.125 82);
-  --color-warning-content: oklch(21% 0.045 82);
-  --color-error: oklch(68% 0.16 20);
-  --color-error-content: oklch(18% 0.04 20);
+  --color-base-100: oklch(15% 0 0);
+  --color-base-200: oklch(19.5% 0 0);
+  --color-base-300: oklch(27.5% 0 0);
+  --color-base-content: oklch(93% 0 0);
+  --color-primary: oklch(97% 0 0);
+  --color-primary-content: oklch(16% 0 0);
+  --color-secondary: oklch(70% 0 0);
+  --color-secondary-content: oklch(16% 0 0);
+  --color-accent: oklch(80% 0 0);
+  --color-accent-content: oklch(16% 0 0);
+  --color-neutral: oklch(27.5% 0 0);
+  --color-neutral-content: oklch(93% 0 0);
+  --color-info: oklch(80% 0 0);
+  --color-info-content: oklch(16% 0 0);
+  --color-success: oklch(72% 0.09 155);
+  --color-success-content: oklch(17% 0.03 155);
+  --color-warning: oklch(79% 0.1 80);
+  --color-warning-content: oklch(19% 0.035 80);
+  --color-error: oklch(67% 0.14 22);
+  --color-error-content: oklch(17% 0.035 22);
 
   --radius-selector: 1rem;
   --radius-field: 0.5rem;
@@ -47,26 +47,26 @@
   prefersdark: false;
   color-scheme: light;
 
-  --color-base-100: oklch(96.5% 0.004 252);
-  --color-base-200: oklch(99.6% 0.0015 252);
-  --color-base-300: oklch(89% 0.008 252);
-  --color-base-content: oklch(24% 0.014 252);
-  --color-primary: oklch(56% 0.105 212);
-  --color-primary-content: oklch(98% 0.008 212);
-  --color-secondary: oklch(44% 0.04 252);
-  --color-secondary-content: oklch(98% 0.005 252);
-  --color-accent: oklch(52% 0.075 186);
-  --color-accent-content: oklch(98% 0.008 186);
-  --color-neutral: oklch(30% 0.014 252);
-  --color-neutral-content: oklch(97% 0.004 252);
-  --color-info: oklch(54% 0.1 234);
-  --color-info-content: oklch(98% 0.008 234);
-  --color-success: oklch(54% 0.115 158);
-  --color-success-content: oklch(98% 0.008 158);
-  --color-warning: oklch(68% 0.135 76);
-  --color-warning-content: oklch(21% 0.045 76);
-  --color-error: oklch(55% 0.185 25);
-  --color-error-content: oklch(98% 0.008 25);
+  --color-base-100: oklch(96% 0 0);
+  --color-base-200: oklch(100% 0 0);
+  --color-base-300: oklch(88% 0 0);
+  --color-base-content: oklch(21% 0 0);
+  --color-primary: oklch(24% 0 0);
+  --color-primary-content: oklch(98% 0 0);
+  --color-secondary: oklch(45% 0 0);
+  --color-secondary-content: oklch(98% 0 0);
+  --color-accent: oklch(38% 0 0);
+  --color-accent-content: oklch(98% 0 0);
+  --color-neutral: oklch(24% 0 0);
+  --color-neutral-content: oklch(98% 0 0);
+  --color-info: oklch(45% 0 0);
+  --color-info-content: oklch(98% 0 0);
+  --color-success: oklch(52% 0.1 155);
+  --color-success-content: oklch(98% 0.01 155);
+  --color-warning: oklch(64% 0.115 76);
+  --color-warning-content: oklch(20% 0.035 76);
+  --color-error: oklch(54% 0.16 25);
+  --color-error-content: oklch(98% 0.01 25);
 
   --radius-selector: 1rem;
   --radius-field: 0.5rem;
@@ -133,10 +133,10 @@
 }
 
 @utility field-legend {
-  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
 }
 

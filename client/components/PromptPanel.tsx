@@ -52,7 +52,7 @@ export function PromptPanel({
         }}
       />
 
-      <div class="border-base-300 flex items-center gap-3 border-t px-3 py-2.5">
+      <div class="border-base-300 flex items-center gap-3 border-t px-3 py-3">
         <span class="text-base-content/35 text-xs tabular-nums">
           {draft.prompt.length.toLocaleString()}
         </span>
@@ -63,13 +63,12 @@ export function PromptPanel({
             : `${plannedImages} image${plannedImages === 1 ? "" : "s"} from ${draft.models.length} model${draft.models.length === 1 ? "" : "s"}`}
         </span>
 
-        <span class="text-base-content/30 ml-auto hidden items-center gap-1 text-[0.7rem] md:flex">
-          <kbd class="kbd kbd-sm">{modifierKey}</kbd>
-          <kbd class="kbd kbd-sm">Enter</kbd>
+        <span class="text-base-content/30 ml-auto hidden text-xs tracking-wide md:block">
+          {modifierKey} + Enter
         </span>
 
         <button
-          class="btn btn-primary btn-sm min-w-24 max-md:ml-auto"
+          class="btn btn-primary h-11 min-w-28 max-md:ml-auto"
           type="button"
           disabled={!ready}
           onClick={onGenerate}

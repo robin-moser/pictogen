@@ -202,7 +202,7 @@ export function SessionSidebar({
               return (
                 <li key={session.id} class="group/session relative">
                   <button
-                    class={`rounded-field flex w-full min-w-0 flex-col items-stretch gap-1 py-2 pr-14 pl-3 text-left transition-colors ${
+                    class={`rounded-field flex w-full min-w-0 flex-col items-stretch gap-1 py-2.5 pr-20 pl-3 text-left transition-colors ${
                       active
                         ? "bg-base-300 text-base-content"
                         : "hover:bg-base-300/50"
@@ -243,16 +243,19 @@ export function SessionSidebar({
                       <span>{formatCost(session.knownCostMicrousd)}</span>
                       {session.activeJobCount > 0 && (
                         <span
-                          class="status status-warning status-xs ml-0.5"
-                          title={`${session.activeJobCount} running`}
-                        />
+                          class="badge badge-warning badge-sm ml-1 gap-1 font-medium"
+                          title={`${session.activeJobCount} job${session.activeJobCount === 1 ? "" : "s"} running`}
+                        >
+                          <span class="loading loading-spinner size-2.5" />
+                          {session.activeJobCount}
+                        </span>
                       )}
                     </span>
                   </button>
 
-                  <div class="absolute top-1.5 right-1.5 flex gap-0.5 opacity-0 transition-opacity group-focus-within/session:opacity-100 group-hover/session:opacity-100 max-md:opacity-100">
+                  <div class="absolute top-1 right-1.5 flex gap-0.5 opacity-0 transition-opacity group-focus-within/session:opacity-100 group-hover/session:opacity-100 max-md:opacity-100">
                     <button
-                      class="btn btn-ghost btn-xs btn-square"
+                      class="btn btn-ghost btn-sm btn-square"
                       type="button"
                       aria-label={`Rename ${session.title}`}
                       title="Rename"
@@ -261,16 +264,16 @@ export function SessionSidebar({
                         setEditTitle(session.title);
                       }}
                     >
-                      <PencilIcon class="size-3.5" />
+                      <PencilIcon class="size-4" />
                     </button>
                     <button
-                      class="btn btn-ghost btn-xs btn-square hover:text-error"
+                      class="btn btn-ghost btn-sm btn-square hover:text-error"
                       type="button"
                       aria-label={`Delete ${session.title}`}
                       title="Delete"
                       onClick={() => onDelete(session)}
                     >
-                      <TrashIcon class="size-3.5" />
+                      <TrashIcon class="size-4" />
                     </button>
                   </div>
                 </li>
@@ -280,9 +283,9 @@ export function SessionSidebar({
         )}
       </nav>
 
-      <div class="border-base-300 flex items-center gap-2 border-t px-4 py-2.5">
+      <div class="border-base-300 flex items-center gap-2.5 border-t px-4 py-3">
         <span
-          class={`status status-sm shrink-0 ${connectionStates[connection].dot}`}
+          class={`status status-md shrink-0 ${connectionStates[connection].dot}`}
           title={connectionStates[connection].label}
           aria-label={connectionStates[connection].label}
         />
@@ -290,7 +293,7 @@ export function SessionSidebar({
           {user}
         </span>
         <button
-          class="btn btn-ghost btn-xs btn-square ml-auto shrink-0"
+          class="btn btn-ghost btn-sm btn-square ml-auto shrink-0"
           type="button"
           aria-label={
             theme === "pictogen-dark"
