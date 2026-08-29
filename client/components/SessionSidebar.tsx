@@ -1,12 +1,36 @@
 import { useState } from "preact/hooks";
 
 import type { SessionSummary } from "../../shared/contracts.js";
+import {
+  CheckIcon,
+  CloseIcon,
+  MoonIcon,
+  PencilIcon,
+  PlusIcon,
+  SunIcon,
+  TrashIcon,
+} from "./Icons.js";
+
+type Theme = "pictogen-dark" | "pictogen-light";
+type ConnectionState = "checking" | "connected" | "unavailable";
+
+const connectionStates: Record<
+  ConnectionState,
+  { label: string; dot: string }
+> = {
+  checking: { label: "Connecting", dot: "status-neutral" },
+  connected: { label: "Connected", dot: "status-success" },
+  unavailable: { label: "Unavailable", dot: "status-error" },
+};
 
 type SessionSidebarProps = {
   sessions: SessionSummary[];
   activeSessionId: string | null;
   user: string;
+  connection: ConnectionState;
   busySessionId: string | null;
+  theme: Theme;
+  onToggleTheme: () => void;
   onCreate: (title: string) => Promise<boolean>;
   onOpen: (sessionId: string) => void;
   onRename: (sessionId: string, title: string) => Promise<boolean>;
@@ -18,11 +42,18 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
   day: "numeric",
 });
 
+function formatCost(microusd: number) {
+  return `$${(microusd / 1_000_000).toFixed(2)}`;
+}
+
 export function SessionSidebar({
   sessions,
   activeSessionId,
   user,
+  connection,
   busySessionId,
+  theme,
+  onToggleTheme,
   onCreate,
   onOpen,
   onRename,
@@ -52,182 +83,196 @@ export function SessionSidebar({
   }
 
   return (
-    <aside class="border-base-300 bg-base-300 flex min-h-full w-[19rem] flex-col border-r">
-      <div class="border-base-300 bg-base-200 border-b px-5 py-5">
-        <div class="flex items-center justify-between gap-3">
-          <a class="group flex items-center gap-3" href="/">
-            <span
-              class="bg-base-content text-base-100 grid size-8 place-items-center rounded-field text-xs font-black tracking-tighter"
-              aria-hidden="true"
-            >
-              PG
-            </span>
-            <span>
-              <span class="block text-sm font-bold tracking-tight">
-                Pictogen
-              </span>
-              <span class="text-base-content/45 block text-[0.65rem] font-semibold tracking-[0.18em] uppercase">
-                Image generation
-              </span>
-            </span>
-          </a>
-        </div>
-      </div>
-
-      <div class="flex items-center justify-between px-5 pt-5 pb-3">
-        <div>
-          <h2 class="text-xs font-bold tracking-[0.14em] uppercase">
-            Sessions
-          </h2>
-          <p class="text-base-content/45 mt-0.5 text-xs">
-            {sessions.length} saved
-          </p>
-        </div>
+    <aside class="border-base-300 bg-base-200 flex min-h-full w-72 flex-col border-r">
+      <div class="flex items-center gap-2.5 px-4 pt-4 pb-3">
+        <a class="flex min-w-0 items-center gap-2.5" href="/">
+          <span
+            class="bg-primary text-primary-content grid size-7 shrink-0 place-items-center rounded-field text-[0.7rem] font-bold tracking-tight"
+            aria-hidden="true"
+          >
+            PG
+          </span>
+          <span class="truncate text-sm font-semibold tracking-tight">
+            Pictogen
+          </span>
+        </a>
         <button
-          class="btn btn-sm btn-square"
+          class="btn btn-ghost btn-sm btn-square ml-auto shrink-0"
           type="button"
-          aria-label="Create session"
-          title="Create session"
+          aria-label="New session"
+          aria-expanded={creating}
+          title="New session"
           onClick={() => setCreating((value) => !value)}
         >
-          <span class="text-lg leading-none" aria-hidden="true">
-            +
-          </span>
+          {creating ? (
+            <CloseIcon class="size-4" />
+          ) : (
+            <PlusIcon class="size-4" />
+          )}
         </button>
       </div>
 
       {creating && (
         <form class="px-3 pb-3" onSubmit={submitCreate}>
-          <label
-            class="text-base-content/60 mb-1.5 block px-2 text-xs font-medium"
-            for="new-session-title"
-          >
-            Session name
-          </label>
-          <div class="flex gap-2">
+          <div class="join w-full">
             <input
               id="new-session-title"
-              class="input input-sm min-w-0 grow"
+              class="input input-sm join-item min-w-0 grow"
               value={createTitle}
               maxLength={120}
-              placeholder="Untitled session"
+              placeholder="Session name"
+              aria-label="New session name"
               autofocus
               onInput={(event) => setCreateTitle(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setCreating(false);
+              }}
             />
-            <button class="btn btn-sm" type="submit">
+            <button
+              class="btn btn-sm btn-primary join-item shrink-0"
+              type="submit"
+            >
               Create
             </button>
           </div>
         </form>
       )}
 
-      <nav
-        class="min-h-0 grow overflow-y-auto px-3 pb-4"
-        aria-label="Saved sessions"
-      >
+      <div class="flex items-center justify-between px-4 pt-1 pb-2">
+        <h2 class="field-legend">Sessions</h2>
+        <span class="text-base-content/40 text-xs tabular-nums">
+          {sessions.length}
+        </span>
+      </div>
+
+      <nav class="scroll-pane grow px-2 pb-3" aria-label="Saved sessions">
         {sessions.length === 0 ? (
-          <div class="border-base-300 mx-2 mt-3 border-t pt-5">
-            <p class="text-sm font-medium">No sessions</p>
-          </div>
+          <p class="text-base-content/40 px-2 py-6 text-center text-xs">
+            No sessions yet.
+          </p>
         ) : (
-          <ul class="menu menu-sm w-full gap-1 p-0">
+          <ul class="flex flex-col gap-0.5">
             {sessions.map((session) => {
               const active = session.id === activeSessionId;
               const editing = session.id === editingId;
               const busy = session.id === busySessionId;
 
-              return (
-                <li key={session.id}>
-                  {editing ? (
+              if (editing) {
+                return (
+                  <li key={session.id}>
                     <form
-                      class="border-base-300 bg-base-100 rounded-field border p-2 shadow-sm"
+                      class="bg-base-100 border-base-300 rounded-field border p-1.5"
                       onSubmit={(event) => submitRename(event, session.id)}
                     >
-                      <input
-                        class="input input-sm w-full"
-                        aria-label={`Rename ${session.title}`}
-                        value={editTitle}
-                        maxLength={120}
-                        autofocus
-                        onInput={(event) =>
-                          setEditTitle(event.currentTarget.value)
-                        }
-                      />
-                      <div class="mt-2 flex justify-end gap-1">
+                      <div class="join w-full">
+                        <input
+                          class="input input-xs join-item min-w-0 grow"
+                          aria-label={`Rename ${session.title}`}
+                          value={editTitle}
+                          maxLength={120}
+                          autofocus
+                          onInput={(event) =>
+                            setEditTitle(event.currentTarget.value)
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") setEditingId(null);
+                          }}
+                        />
                         <button
-                          class="btn btn-ghost btn-xs"
+                          class="btn btn-xs btn-square join-item"
+                          type="submit"
+                          aria-label="Save name"
+                        >
+                          <CheckIcon class="size-3.5" />
+                        </button>
+                        <button
+                          class="btn btn-xs btn-square join-item"
                           type="button"
+                          aria-label="Cancel rename"
                           onClick={() => setEditingId(null)}
                         >
-                          Cancel
-                        </button>
-                        <button class="btn btn-xs" type="submit">
-                          Save
+                          <CloseIcon class="size-3.5" />
                         </button>
                       </div>
                     </form>
-                  ) : (
-                    <div
-                      class={`group/session relative rounded-field border-l-2 p-0 ${
-                        active
-                          ? "border-primary bg-base-100 shadow-sm"
-                          : "border-transparent"
-                      }`}
-                    >
-                      <button
-                        class="flex w-full min-w-0 flex-col items-stretch gap-1 px-3 py-2.5 pr-16 text-left"
-                        type="button"
-                        disabled={busy}
-                        aria-current={active ? "page" : undefined}
-                        onClick={() => onOpen(session.id)}
+                  </li>
+                );
+              }
+
+              return (
+                <li key={session.id} class="group/session relative">
+                  <button
+                    class={`rounded-field flex w-full min-w-0 flex-col items-stretch gap-1 py-2 pr-14 pl-3 text-left transition-colors ${
+                      active
+                        ? "bg-base-300 text-base-content"
+                        : "hover:bg-base-300/50"
+                    }`}
+                    type="button"
+                    disabled={busy}
+                    aria-current={active ? "page" : undefined}
+                    onClick={() => onOpen(session.id)}
+                  >
+                    <span class="flex min-w-0 items-center gap-2">
+                      {active && (
+                        <span
+                          class="bg-primary h-3.5 w-0.5 shrink-0 rounded-full"
+                          aria-hidden="true"
+                        />
+                      )}
+                      <span
+                        class={`min-w-0 truncate text-sm ${active ? "font-semibold" : "font-medium"}`}
                       >
-                        <span class="flex min-w-0 items-center gap-2">
-                          {busy && (
-                            <span
-                              class="loading loading-spinner loading-xs"
-                              aria-label="Loading"
-                            />
-                          )}
-                          <span class="min-w-0 truncate font-medium">
-                            {session.title}
-                          </span>
-                        </span>
-                        <span class="text-base-content/45 flex gap-2 text-[0.68rem]">
-                          <span>
-                            {dateFormatter.format(new Date(session.updatedAt))}
-                          </span>
-                          <span aria-hidden="true">/</span>
-                          <span>
-                            $
-                            {(session.knownCostMicrousd / 1_000_000).toFixed(2)}
-                          </span>
-                        </span>
-                      </button>
-                      <div class="absolute top-1.5 right-1 flex opacity-100 md:opacity-0 md:group-hover/session:opacity-100 md:group-focus-within/session:opacity-100">
-                        <button
-                          class="btn btn-ghost btn-xs px-1.5"
-                          type="button"
-                          aria-label={`Rename ${session.title}`}
-                          title="Rename"
-                          onClick={() => {
-                            setEditingId(session.id);
-                            setEditTitle(session.title);
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          class="btn btn-ghost btn-xs text-error px-1.5"
-                          type="button"
-                          aria-label={`Delete ${session.title}`}
-                          title="Delete"
-                          onClick={() => onDelete(session)}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                        {session.title}
+                      </span>
+                      {busy && (
+                        <span
+                          class="loading loading-spinner loading-xs shrink-0"
+                          aria-label="Loading"
+                        />
+                      )}
+                    </span>
+                    <span
+                      class={`text-base-content/45 flex items-center gap-1.5 text-[0.7rem] tabular-nums ${active ? "pl-2.5" : ""}`}
+                    >
+                      <span>
+                        {dateFormatter.format(new Date(session.updatedAt))}
+                      </span>
+                      <span class="text-base-content/25" aria-hidden="true">
+                        ·
+                      </span>
+                      <span>{formatCost(session.knownCostMicrousd)}</span>
+                      {session.activeJobCount > 0 && (
+                        <span
+                          class="status status-warning status-xs ml-0.5"
+                          title={`${session.activeJobCount} running`}
+                        />
+                      )}
+                    </span>
+                  </button>
+
+                  <div class="absolute top-1.5 right-1.5 flex gap-0.5 opacity-0 transition-opacity group-focus-within/session:opacity-100 group-hover/session:opacity-100 max-md:opacity-100">
+                    <button
+                      class="btn btn-ghost btn-xs btn-square"
+                      type="button"
+                      aria-label={`Rename ${session.title}`}
+                      title="Rename"
+                      onClick={() => {
+                        setEditingId(session.id);
+                        setEditTitle(session.title);
+                      }}
+                    >
+                      <PencilIcon class="size-3.5" />
+                    </button>
+                    <button
+                      class="btn btn-ghost btn-xs btn-square hover:text-error"
+                      type="button"
+                      aria-label={`Delete ${session.title}`}
+                      title="Delete"
+                      onClick={() => onDelete(session)}
+                    >
+                      <TrashIcon class="size-3.5" />
+                    </button>
+                  </div>
                 </li>
               );
             })}
@@ -235,8 +280,32 @@ export function SessionSidebar({
         )}
       </nav>
 
-      <div class="border-base-300 bg-base-200 text-base-content/55 border-t px-5 py-3 text-xs">
-        Workspace for <span class="text-base-content font-medium">{user}</span>
+      <div class="border-base-300 flex items-center gap-2 border-t px-4 py-2.5">
+        <span
+          class={`status status-sm shrink-0 ${connectionStates[connection].dot}`}
+          title={connectionStates[connection].label}
+          aria-label={connectionStates[connection].label}
+        />
+        <span class="text-base-content/45 min-w-0 truncate text-xs">
+          {user}
+        </span>
+        <button
+          class="btn btn-ghost btn-xs btn-square ml-auto shrink-0"
+          type="button"
+          aria-label={
+            theme === "pictogen-dark"
+              ? "Switch to light theme"
+              : "Switch to dark theme"
+          }
+          title="Toggle theme"
+          onClick={onToggleTheme}
+        >
+          {theme === "pictogen-dark" ? (
+            <SunIcon class="size-4" />
+          ) : (
+            <MoonIcon class="size-4" />
+          )}
+        </button>
       </div>
     </aside>
   );

@@ -2,6 +2,14 @@ import { MasonryGrid } from "@egjs/grid";
 import { useEffect, useRef, useState } from "preact/hooks";
 
 import type { SessionDetail } from "../../shared/contracts.js";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CloseIcon,
+  DownloadIcon,
+  GridIcon,
+  TrashIcon,
+} from "./Icons.js";
 
 type Job = SessionDetail["runs"][number]["jobs"][number];
 type Run = SessionDetail["runs"][number];
@@ -10,6 +18,7 @@ type Output = Job["outputs"][number];
 type Props = {
   session: SessionDetail;
   columns: number;
+  onColumnsChange: (columns: number) => void;
   busyItemId: string | null;
   onCancelJob: (jobId: string) => void;
   onDeleteOutput: (assetId: string) => void;
@@ -20,6 +29,7 @@ type Props = {
 export function OutputSection({
   session,
   columns,
+  onColumnsChange,
   busyItemId,
   onCancelJob,
   onDeleteOutput,
@@ -72,12 +82,12 @@ export function OutputSection({
     const grid = new MasonryGrid(element, {
       align: "stretch",
       column: columns,
-      gap: large.matches ? 16 : 8,
+      gap: large.matches ? 12 : 8,
       useResizeObserver: true,
       observeChildren: true,
     });
     const updateLayout = () => {
-      grid.gap = large.matches ? 16 : 8;
+      grid.gap = large.matches ? 12 : 8;
       grid.renderItems({ useOrgResize: true });
     };
 
@@ -92,6 +102,14 @@ export function OutputSection({
     };
   }, [columns, galleryKey]);
 
+  function step(direction: number) {
+    if (!lightboxItems.length) return;
+    const nextIndex =
+      (lightboxIndex + direction + lightboxItems.length) % lightboxItems.length;
+    const nextImage = lightboxItems[nextIndex];
+    if (nextImage) setLightboxId(nextImage.output.id);
+  }
+
   useEffect(() => {
     if (!lightboxImage) return;
 
@@ -102,13 +120,7 @@ export function OutputSection({
       }
 
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-
-      const direction = event.key === "ArrowRight" ? 1 : -1;
-      const nextIndex =
-        (lightboxIndex + direction + lightboxItems.length) %
-        lightboxItems.length;
-      const nextImage = lightboxItems[nextIndex];
-      if (nextImage) setLightboxId(nextImage.output.id);
+      step(event.key === "ArrowRight" ? 1 : -1);
       event.preventDefault();
     };
 
@@ -116,10 +128,44 @@ export function OutputSection({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [lightboxImage, lightboxIndex, lightboxKey]);
 
-  if (!session.runs.length) return null;
+  if (!session.runs.length)
+    return (
+      <p class="text-base-content/25 py-10 text-center text-xs">
+        No images yet.
+      </p>
+    );
 
   return (
-    <section class="space-y-4 py-5">
+    <section class="pt-3" aria-labelledby="gallery-heading">
+      <div class="mb-2.5 flex items-center gap-3">
+        <h2 id="gallery-heading" class="field-legend flex items-center gap-1.5">
+          Gallery
+          <span class="text-base-content/30 tabular-nums">
+            {lightboxItems.length}
+          </span>
+        </h2>
+
+        <label
+          class="text-base-content/35 hover:text-base-content/60 ml-auto flex items-center gap-2 transition-colors"
+          title="Images per line"
+        >
+          <GridIcon class="size-3.5" />
+          <span class="sr-only">Images per line</span>
+          <input
+            class="range range-xs w-20"
+            type="range"
+            min="1"
+            max="6"
+            step="1"
+            value={columns}
+            onInput={(event) =>
+              onColumnsChange(Number(event.currentTarget.value))
+            }
+          />
+          <span class="w-2 text-[0.7rem] tabular-nums">{columns}</span>
+        </label>
+      </div>
+
       {galleryItems.length > 0 && (
         <div ref={galleryRef}>
           {galleryItems.map(({ job, run, output }, index) => (
@@ -141,91 +187,82 @@ export function OutputSection({
       )}
 
       {failures.length > 0 && (
-        <details class="collapse-arrow border-base-300 bg-base-100 collapse border">
-          <summary class="collapse-title flex min-h-0 items-center gap-2 py-3 text-sm font-medium">
+        <details class="border-base-300 bg-base-200 rounded-box mt-3 border">
+          <summary class="text-base-content/60 hover:text-base-content flex cursor-pointer items-center gap-2 px-3 py-2.5 text-xs font-medium transition-colors">
             Generation log
-            <span class="badge badge-error badge-sm">{failures.length}</span>
+            <span class="badge badge-error badge-xs">{failures.length}</span>
+            <button
+              class="btn btn-ghost btn-xs ml-auto"
+              type="button"
+              disabled={actionsBusy}
+              onClick={(event) => {
+                event.preventDefault();
+                onClearGenerationLog();
+              }}
+            >
+              {busyItemId === session.id ? "Deleting…" : "Clear"}
+            </button>
           </summary>
-          <div class="collapse-content px-0 pb-0">
-            <div class="border-base-300 flex justify-end border-t px-4 py-2">
-              <button
-                class="btn btn-ghost btn-xs"
-                type="button"
-                disabled={actionsBusy}
-                onClick={onClearGenerationLog}
-              >
-                {busyItemId === session.id && (
-                  <span class="loading loading-spinner loading-xs" />
-                )}
-                {busyItemId === session.id ? "Deleting..." : "Delete all"}
-              </button>
-            </div>
-            <ul class="divide-base-300 divide-y border-t border-base-300">
-              {failures.map(({ job, run }) => (
-                <li
-                  key={job.id}
-                  class="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start"
-                >
-                  <div class="min-w-0 grow">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span class="font-medium">{job.modelName}</span>
-                      <span class="badge badge-error badge-sm">Failed</span>
-                    </div>
-                    <p class="text-base-content/45 mt-0.5 truncate text-xs">
-                      {job.providerId} / {job.modelId} ·{" "}
-                      {formatEffectiveOptions(job)} ·{" "}
-                      {formatDate(job.createdAt)}
-                    </p>
-                    <p class="text-error mt-2 text-sm">
-                      {job.errorMessage ?? "Generation failed."}
-                    </p>
-                    <p class="text-base-content/50 mt-1 text-xs">
-                      {formatCost(job)}
-                    </p>
+          <ul class="divide-base-300 border-base-300 divide-y border-t">
+            {failures.map(({ job }) => (
+              <li key={job.id} class="flex items-start gap-3 px-3 py-2.5">
+                <div class="min-w-0 grow">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-xs font-medium">{job.modelName}</span>
+                    <span class="badge badge-error badge-xs">Failed</span>
                   </div>
-                  <button
-                    class="btn btn-ghost btn-xs btn-square self-end sm:self-auto"
-                    type="button"
-                    disabled={actionsBusy}
-                    onClick={() => onDismissJob(job.id)}
-                    aria-label={`Delete ${job.modelName} log entry`}
-                  >
-                    {busyItemId === job.id ? (
-                      <span class="loading loading-spinner loading-xs" />
-                    ) : (
-                      <TrashIcon />
-                    )}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+                  <p class="text-base-content/40 mt-0.5 truncate text-[0.68rem]">
+                    {job.providerId} / {job.modelId} ·{" "}
+                    {formatEffectiveOptions(job)} · {formatDate(job.createdAt)}
+                  </p>
+                  <p class="text-error mt-1 text-xs">
+                    {job.errorMessage ?? "Generation failed."}
+                  </p>
+                </div>
+                <button
+                  class="btn btn-ghost btn-xs btn-square shrink-0"
+                  type="button"
+                  disabled={actionsBusy}
+                  onClick={() => onDismissJob(job.id)}
+                  aria-label={`Delete ${job.modelName} log entry`}
+                >
+                  {busyItemId === job.id ? (
+                    <span class="loading loading-spinner loading-xs" />
+                  ) : (
+                    <TrashIcon class="size-3.5" />
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
         </details>
       )}
 
       {lightboxImage && (
         <dialog
           open
-          class="modal modal-open bg-black/80 p-4"
+          class="modal modal-open bg-black/85"
           aria-label={`Generated image from ${lightboxImage.job.modelName}`}
           onClick={() => setLightboxId(null)}
         >
-          <div class="relative flex h-[90vh] w-[95vw] items-center justify-center">
+          <div class="relative flex h-dvh w-screen items-center justify-center p-4">
             <div
               class="relative max-h-full max-w-full"
               onClick={(event) => event.stopPropagation()}
             >
               <img
-                class="block max-h-[90vh] max-w-[95vw] object-contain"
+                class="block max-h-[88vh] max-w-[92vw] object-contain"
                 src={`/api/assets/${encodeURIComponent(lightboxImage.output.id)}`}
                 alt={`Expanded generated image for ${lightboxImage.job.modelName}`}
               />
-              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/80 to-transparent px-4 pt-12 pb-4 text-white">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/75 to-transparent px-4 pt-14 pb-4 text-white">
                 <p class="line-clamp-3 text-sm leading-relaxed">
                   {lightboxImage.run.prompt}
                 </p>
-                <div class="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/75">
-                  <span>{lightboxImage.job.modelName}</span>
+                <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.7rem] text-white/60">
+                  <span class="text-white/85">
+                    {lightboxImage.job.modelName}
+                  </span>
                   <span>
                     {lightboxImage.job.providerId} / {lightboxImage.job.modelId}
                   </span>
@@ -236,15 +273,54 @@ export function OutputSection({
                   </time>
                 </div>
               </div>
+
+              <a
+                class="btn btn-sm btn-square absolute top-2 right-12 border-white/15 bg-black/60 text-white hover:bg-black"
+                href={`/api/assets/${encodeURIComponent(lightboxImage.output.id)}`}
+                download={downloadFilename(
+                  lightboxImage.job,
+                  lightboxImage.output,
+                )}
+                aria-label="Download image"
+              >
+                <DownloadIcon class="size-4" />
+              </a>
               <button
-                class="btn btn-circle btn-sm absolute top-2 right-2"
+                class="btn btn-sm btn-square absolute top-2 right-2 border-white/15 bg-black/60 text-white hover:bg-black"
                 type="button"
                 onClick={() => setLightboxId(null)}
                 aria-label="Close image"
               >
-                ×
+                <CloseIcon class="size-4" />
               </button>
             </div>
+
+            {lightboxItems.length > 1 && (
+              <>
+                <button
+                  class="btn btn-sm btn-circle absolute left-3 border-white/15 bg-black/60 text-white hover:bg-black"
+                  type="button"
+                  aria-label="Previous image"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    step(-1);
+                  }}
+                >
+                  <ChevronLeftIcon class="size-4" />
+                </button>
+                <button
+                  class="btn btn-sm btn-circle absolute right-3 border-white/15 bg-black/60 text-white hover:bg-black"
+                  type="button"
+                  aria-label="Next image"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    step(1);
+                  }}
+                >
+                  <ChevronRightIcon class="size-4" />
+                </button>
+              </>
+            )}
           </div>
         </dialog>
       )}
@@ -280,7 +356,7 @@ function GalleryItem({
 
   return (
     <figure
-      class="group bg-base-300 relative overflow-hidden rounded-box outline-offset-2 focus-within:outline-2 focus-within:outline-primary"
+      class="group bg-base-200 border-base-300 focus-within:outline-primary relative overflow-hidden rounded-box border outline-offset-2 focus-within:outline-2"
       style={output ? undefined : { aspectRatio }}
     >
       {output ? (
@@ -303,7 +379,7 @@ function GalleryItem({
           aria-label={`Open generated image for ${job.modelName}`}
         >
           <img
-            class="block h-auto w-full transition duration-300 group-hover:scale-105"
+            class="block h-auto w-full transition duration-300 group-hover:scale-[1.03]"
             loading="lazy"
             src={`/api/assets/${encodeURIComponent(output.id)}`}
             alt={`Generated image for ${job.modelName}`}
@@ -311,7 +387,7 @@ function GalleryItem({
         </button>
       ) : (
         <button
-          class="text-base-content/35 flex h-full w-full items-center justify-center"
+          class="text-base-content/30 flex h-full w-full items-center justify-center"
           type="button"
           onClick={onReveal}
           aria-expanded={revealed}
@@ -321,7 +397,7 @@ function GalleryItem({
           {job.status === "running" ? (
             <span class="loading loading-spinner loading-md" />
           ) : (
-            <span class="status status-warning status-lg" />
+            <span class="status status-warning status-md" />
           )}
           <span class="sr-only">
             {job.status === "running" ? "Generating image" : "Image queued"}
@@ -330,24 +406,24 @@ function GalleryItem({
       )}
 
       <div
-        class={`pointer-events-none absolute inset-0 flex flex-col justify-between bg-gradient-to-b from-black/80 via-black/10 to-black/90 p-2.5 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100 ${revealed ? "opacity-100" : ""}`}
+        class={`pointer-events-none absolute inset-0 flex flex-col justify-between bg-gradient-to-b from-black/70 via-transparent to-black/85 p-2 text-white opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 ${revealed ? "opacity-100" : ""}`}
         id={`gallery-details-${itemId}`}
       >
         <div
-          class={`pointer-events-none flex justify-end gap-1.5 group-hover:pointer-events-auto group-focus-within:pointer-events-auto ${revealed ? "pointer-events-auto" : ""}`}
+          class={`pointer-events-none flex justify-end gap-1 group-focus-within:pointer-events-auto group-hover:pointer-events-auto ${revealed ? "pointer-events-auto" : ""}`}
         >
           {output ? (
             <>
               <a
-                class="btn btn-xs btn-square border-white/20 bg-black/65 text-white hover:bg-black"
+                class="btn btn-xs btn-square border-white/15 bg-black/60 text-white hover:bg-black"
                 href={`/api/assets/${encodeURIComponent(output.id)}`}
                 download={downloadFilename(job, output)}
                 aria-label={`Download image from ${job.modelName}`}
               >
-                <DownloadIcon />
+                <DownloadIcon class="size-3.5" />
               </a>
               <button
-                class="btn btn-xs btn-square border-white/20 bg-black/65 text-white hover:bg-black"
+                class="btn btn-xs btn-square border-white/15 bg-black/60 text-white hover:bg-black"
                 type="button"
                 disabled={actionsBusy}
                 onClick={onDelete}
@@ -356,31 +432,28 @@ function GalleryItem({
                 {busy ? (
                   <span class="loading loading-spinner loading-xs" />
                 ) : (
-                  <TrashIcon />
+                  <TrashIcon class="size-3.5" />
                 )}
               </button>
             </>
           ) : job.status === "queued" ? (
             <button
-              class="btn btn-xs border-white/20 bg-black/65 text-white hover:bg-black"
+              class="btn btn-xs border-white/15 bg-black/60 text-white hover:bg-black"
               type="button"
               disabled={actionsBusy}
               onClick={onCancel}
             >
               {busy && <span class="loading loading-spinner loading-xs" />}
-              {busy ? "Cancelling..." : "Cancel"}
+              {busy ? "Cancelling…" : "Cancel"}
             </button>
           ) : null}
         </div>
 
-        <figcaption class="text-xs drop-shadow">
+        <figcaption class="text-[0.7rem] leading-4 drop-shadow">
           <p class="truncate font-semibold" title={job.modelName}>
             {job.modelName}
           </p>
-          <p class="truncate text-white/70" title={job.modelId}>
-            {job.providerId} / {job.modelId}
-          </p>
-          <p class="mt-1 text-white/80">
+          <p class="truncate text-white/60" title={job.modelId}>
             {formatEffectiveOptions(job)} ·{" "}
             {output
               ? formatCost(job)
@@ -388,9 +461,6 @@ function GalleryItem({
                 ? "Generating"
                 : "Queued"}
           </p>
-          <time class="text-white/60" dateTime={job.createdAt}>
-            {formatDate(job.createdAt)}
-          </time>
         </figcaption>
       </div>
     </figure>
@@ -454,34 +524,4 @@ function downloadFilename(job: Job, output: Output) {
     String(createdAt.getUTCSeconds()).padStart(2, "0"),
   ].join("");
   return `pictogen-${stamp}-${model || "image"}.${extension ?? "png"}`;
-}
-
-function DownloadIcon() {
-  return (
-    <svg
-      class="size-4"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      aria-hidden="true"
-    >
-      <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg
-      class="size-4"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      aria-hidden="true"
-    >
-      <path d="M4 7h16m-10 4v6m4-6v6M9 7l1-3h4l1 3m3 0-1 14H7L6 7" />
-    </svg>
-  );
 }

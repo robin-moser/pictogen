@@ -1,58 +1,85 @@
+import type { ComponentChildren } from "preact";
+
 import type { SessionDraft } from "../../shared/contracts.js";
+
+const modifierKey =
+  typeof navigator !== "undefined" &&
+  /Mac|iPhone|iPad/.test(navigator.userAgent)
+    ? "⌘"
+    : "Ctrl";
+
 export function PromptPanel({
   draft,
+  references,
   onDraftChange,
   onGenerate,
   generationBlocked,
   generationBlockMessage,
 }: {
   draft: SessionDraft;
+  references: ComponentChildren;
   onDraftChange: (draft: SessionDraft) => void;
   onGenerate: () => void;
   generationBlocked: boolean;
   generationBlockMessage: string | undefined;
 }) {
+  const ready =
+    Boolean(draft.prompt.trim()) &&
+    draft.models.length > 0 &&
+    !generationBlocked;
+  const plannedImages = draft.models.length * draft.count;
+
   return (
-    <section class="border-base-300 focus-within:border-base-content/35 flex min-h-80 flex-col overflow-hidden rounded-box border bg-base-100 shadow-sm transition-colors">
+    <section class="border-base-300 bg-base-200 focus-within:border-base-content/25 rounded-box flex flex-col overflow-hidden border transition-colors">
       <h2 class="sr-only">Prompt</h2>
+
+      {references}
+
       <textarea
-        class="textarea min-h-0 w-full grow resize-none rounded-none border-0 bg-transparent px-5 py-5 text-base leading-7 focus:outline-none sm:px-6 sm:py-6"
+        class="textarea min-h-32 w-full resize-none rounded-none border-0 bg-transparent px-4 py-3.5 text-[0.95rem] leading-6 focus:outline-none"
         aria-label="Image prompt"
         value={draft.prompt}
         maxLength={12_000}
-        placeholder="Describe the image you want to generate..."
+        placeholder="Describe the image you want to generate…"
         onInput={(event) =>
           onDraftChange({ ...draft, prompt: event.currentTarget.value })
         }
         onKeyDown={(event) => {
           if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
             event.preventDefault();
-            if (
-              draft.prompt.trim() &&
-              draft.models.length &&
-              !generationBlocked
-            )
-              onGenerate();
+            if (ready) onGenerate();
           }
         }}
       />
-      <div class="border-base-300 flex min-h-16 items-center justify-between gap-4 border-t px-4 py-3 sm:px-5">
-        <span class="text-base-content/45 text-xs tabular-nums">
-          {draft.prompt.length.toLocaleString()} chars
+
+      <div class="border-base-300 flex items-center gap-3 border-t px-3 py-2.5">
+        <span class="text-base-content/35 text-xs tabular-nums">
+          {draft.prompt.length.toLocaleString()}
         </span>
+
+        <span class="text-base-content/45 hidden text-xs sm:block">
+          {draft.models.length === 0
+            ? "No model selected"
+            : `${plannedImages} image${plannedImages === 1 ? "" : "s"} from ${draft.models.length} model${draft.models.length === 1 ? "" : "s"}`}
+        </span>
+
+        <span class="text-base-content/30 ml-auto hidden items-center gap-1 text-[0.7rem] md:flex">
+          <kbd class="kbd kbd-sm">{modifierKey}</kbd>
+          <kbd class="kbd kbd-sm">Enter</kbd>
+        </span>
+
         <button
-          class="btn btn-primary min-w-28"
+          class="btn btn-primary btn-sm min-w-24 max-md:ml-auto"
           type="button"
-          disabled={
-            !draft.prompt.trim() || !draft.models.length || generationBlocked
-          }
+          disabled={!ready}
           onClick={onGenerate}
         >
           Generate
         </button>
       </div>
+
       {generationBlockMessage && (
-        <p class="bg-error/10 text-error px-4 py-2 text-xs sm:px-5">
+        <p class="bg-error/10 text-error border-base-300 border-t px-3 py-2 text-xs">
           {generationBlockMessage}
         </p>
       )}

@@ -3,12 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#e9edf2" />
+    <meta
+      name="theme-color"
+      content="#f2f4f7"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#15181d"
+      media="(prefers-color-scheme: dark)"
+    />
     <meta
       name="description"
       content="Pictogen, a private workspace for AI image generation."
     />
     <title>Pictogen</title>
+    <script>
+      try {
+        var stored = localStorage.getItem("pictogen-theme");
+        document.documentElement.dataset.theme =
+          stored === "pictogen-light" || stored === "pictogen-dark"
+            ? stored
+            : matchMedia("(prefers-color-scheme: light)").matches
+              ? "pictogen-light"
+              : "pictogen-dark";
+      } catch (error) {
+        document.documentElement.dataset.theme = "pictogen-dark";
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>

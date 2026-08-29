@@ -1,5 +1,6 @@
 import type { ImageModel, SessionDraft } from "../../shared/contracts.js";
 import { resolveEffectiveOptions } from "../../shared/capabilities.js";
+import { AlertIcon, CloseIcon, PlusIcon, SearchIcon } from "./Icons.js";
 
 type Props = {
   draft: SessionDraft;
@@ -11,7 +12,20 @@ type Props = {
   onDraftChange: (draft: SessionDraft) => void;
   onModelSearch: (value: string) => void;
   onToggleModel: (model: ImageModel) => void;
+  onClose: () => void;
 };
+
+const resolutions = ["512", "1K", "2K", "4K"] as const;
+const aspectRatios = [
+  "1:1",
+  "16:9",
+  "9:16",
+  "4:3",
+  "3:4",
+  "3:2",
+  "2:3",
+] as const;
+
 export function SettingsSidebar({
   draft,
   models,
@@ -22,6 +36,7 @@ export function SettingsSidebar({
   onDraftChange,
   onModelSearch,
   onToggleModel,
+  onClose,
 }: Props) {
   const selected = new Set(
     draft.models.map((model) => `${model.providerId}:${model.modelId}`),
@@ -55,6 +70,8 @@ export function SettingsSidebar({
       (change) => `${model.name}: ${change}.`,
     ),
   );
+  const modelsFull = draft.models.length >= 3;
+
   function clearOutputOption(
     option: "quality" | "background" | "outputFormat" | "outputCompression",
   ) {
@@ -75,117 +92,137 @@ export function SettingsSidebar({
     }
     onDraftChange(nextDraft);
   }
+
   return (
-    <aside
-      class="border-base-300 min-h-full border-y-0 border-r-0 bg-base-300 p-5 shadow-none lg:border-l"
+    <div
+      class="bg-base-200 flex h-full min-h-0 flex-col"
       aria-labelledby="settings-heading"
     >
-      <h2 id="settings-heading" class="text-lg font-semibold">
-        Settings
-      </h2>
-      <section
-        class="border-base-300 mt-5 border-t pt-5"
-        aria-labelledby="models-heading"
-      >
-        <div class="flex items-baseline justify-between gap-4">
-          <h3 id="models-heading" class="font-semibold">
-            Models
-          </h3>
-          <span class="text-base-content/45 text-xs">
-            {draft.models.length} / 3 selected
-          </span>
-        </div>
-        {selectedModels.length > 0 && (
-          <ul class="mt-4 grid gap-2" aria-label="Selected models">
-            {selectedModels.map((model) => (
-              <li
-                key={`${model.providerId}:${model.modelId}`}
-                class="card card-border bg-base-100"
-              >
-                <div class="card-body flex-row items-center gap-3 p-3">
-                  <div class="min-w-0 grow">
-                    <p class="truncate text-sm font-medium">{model.name}</p>
-                    <p class="text-base-content/50 truncate text-xs">
+      <div class="border-base-300 flex shrink-0 items-center justify-between border-b px-4 py-3">
+        <h2 id="settings-heading" class="text-sm font-semibold tracking-tight">
+          Settings
+        </h2>
+        <button
+          class="btn btn-ghost btn-xs btn-square xl:hidden"
+          type="button"
+          aria-label="Close settings"
+          onClick={onClose}
+        >
+          <CloseIcon class="size-4" />
+        </button>
+      </div>
+
+      <div class="scroll-pane grow px-4 py-4">
+        <section aria-labelledby="models-heading">
+          <div class="flex items-baseline justify-between gap-3">
+            <h3 id="models-heading" class="field-legend">
+              Models
+            </h3>
+            <span class="text-base-content/40 text-xs tabular-nums">
+              {draft.models.length}/3
+            </span>
+          </div>
+
+          {selectedModels.length > 0 && (
+            <ul class="mt-2.5 flex flex-col gap-1" aria-label="Selected models">
+              {selectedModels.map((model) => (
+                <li
+                  key={`${model.providerId}:${model.modelId}`}
+                  class="bg-base-100 border-base-300 rounded-field flex items-center gap-2 border py-1.5 pr-1.5 pl-2.5"
+                >
+                  <span class="bg-primary size-1.5 shrink-0 rounded-full" />
+                  <span class="min-w-0 grow">
+                    <span class="block truncate text-xs font-medium">
+                      {model.name}
+                    </span>
+                    <span class="text-base-content/40 block truncate text-[0.68rem]">
                       {model.modelId}
-                    </p>
-                  </div>
+                    </span>
+                  </span>
                   <button
-                    class="btn btn-ghost btn-xs shrink-0"
+                    class="btn btn-ghost btn-xs btn-square shrink-0"
                     type="button"
                     onClick={() => onToggleModel(model)}
                     aria-label={`Remove ${model.name}`}
+                    title="Remove"
                   >
-                    Remove
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        <input
-          class="input input-sm mt-4 w-full"
-          type="search"
-          value={modelSearch}
-          placeholder="Search the model catalog"
-          aria-label="Search image models"
-          onInput={(event) => onModelSearch(event.currentTarget.value)}
-        />
-        {catalogStale && (
-          <p class="text-warning mt-3 text-xs">
-            Showing a cached model catalog.
-          </p>
-        )}
-        {modelError && <p class="text-error mt-3 text-xs">{modelError}</p>}
-        <div class="mt-3">
-          <p class="text-base-content/50 mb-2 text-xs font-medium">
-            {visibleModels.length} available model
-            {visibleModels.length === 1 ? "" : "s"}
-          </p>
-          {visibleModels.length === 0 ? (
-            <p class="text-base-content/50 rounded-box border-base-300 border px-3 py-4 text-sm">
-              No available models found.
-            </p>
-          ) : (
-            <ul class="max-h-72 space-y-2 overflow-y-auto pr-1">
-              {visibleModels.map((model) => (
-                <li key={`${model.providerId}:${model.modelId}`}>
-                  <button
-                    class="btn h-auto min-h-0 w-full justify-start px-3 py-2.5 text-left whitespace-normal"
-                    type="button"
-                    disabled={draft.models.length >= 3}
-                    onClick={() => onToggleModel(model)}
-                  >
-                    <span class="min-w-0 grow">
-                      <span class="block truncate text-sm font-medium">
-                        {model.name}
-                      </span>
-                      <span class="text-base-content/50 block truncate text-xs font-normal">
-                        {model.description ?? model.modelId}
-                      </span>
-                    </span>
-                    <span class="badge badge-ghost badge-sm shrink-0">Add</span>
+                    <CloseIcon class="size-3.5" />
                   </button>
                 </li>
               ))}
             </ul>
           )}
-        </div>
-      </section>
-      <section
-        class="border-base-300 mt-7 border-t pt-5"
-        aria-labelledby="generation-heading"
-      >
-        <h3 id="generation-heading" class="font-semibold">
-          Generation
-        </h3>
-        <div class="mt-4 grid gap-5">
-          <fieldset>
-            <legend class="text-xs font-semibold">Resolution</legend>
-            <div class="mt-2 grid grid-cols-4 gap-1.5">
-              {(["512", "1K", "2K", "4K"] as const).map((resolution) => (
+
+          <label class="input input-sm mt-2.5 w-full">
+            <SearchIcon class="text-base-content/35 size-3.5" />
+            <input
+              type="search"
+              value={modelSearch}
+              placeholder="Search models"
+              aria-label="Search image models"
+              onInput={(event) => onModelSearch(event.currentTarget.value)}
+            />
+          </label>
+
+          {catalogStale && (
+            <p class="text-warning mt-2 text-xs">Showing a cached catalog.</p>
+          )}
+          {modelError && <p class="text-error mt-2 text-xs">{modelError}</p>}
+
+          {visibleModels.length === 0 ? (
+            <p class="text-base-content/40 mt-2.5 px-1 py-3 text-xs">
+              No matching models.
+            </p>
+          ) : (
+            <ul class="border-base-300 rounded-field mt-2.5 max-h-64 divide-y divide-base-300 overflow-y-auto border">
+              {visibleModels.map((model) => (
+                <li key={`${model.providerId}:${model.modelId}`}>
+                  <button
+                    class="hover:bg-base-300/50 group/model flex w-full items-center gap-2 px-2.5 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-35"
+                    type="button"
+                    disabled={modelsFull}
+                    title={
+                      modelsFull ? "Three models already selected" : undefined
+                    }
+                    onClick={() => onToggleModel(model)}
+                  >
+                    <span class="min-w-0 grow">
+                      <span class="block truncate text-xs font-medium">
+                        {model.name}
+                      </span>
+                      <span class="text-base-content/40 block truncate text-[0.68rem]">
+                        {model.description ?? model.modelId}
+                      </span>
+                    </span>
+                    <PlusIcon class="text-base-content/30 group-hover/model:text-primary size-3.5 shrink-0 transition-colors" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section
+          class="border-base-300 mt-6 border-t pt-4"
+          aria-labelledby="generation-heading"
+        >
+          <h3 id="generation-heading" class="field-legend">
+            Generation
+          </h3>
+
+          <fieldset class="mt-3">
+            <legend class="text-base-content/60 mb-1.5 text-xs font-medium">
+              Resolution
+            </legend>
+            <div class="join w-full">
+              {resolutions.map((resolution) => (
                 <button
                   key={resolution}
-                  class={`btn btn-sm ${draft.resolution === resolution ? "btn-active" : "btn-outline"}`}
+                  class={`btn btn-xs join-item flex-1 ${
+                    draft.resolution === resolution
+                      ? "btn-primary"
+                      : "bg-base-100"
+                  }`}
                   type="button"
                   aria-pressed={draft.resolution === resolution}
                   onClick={() => onDraftChange({ ...draft, resolution })}
@@ -195,15 +232,20 @@ export function SettingsSidebar({
               ))}
             </div>
           </fieldset>
-          <fieldset>
-            <legend class="text-xs font-semibold">Aspect ratio</legend>
-            <div class="mt-2 grid grid-cols-3 gap-1.5">
-              {(
-                ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"] as const
-              ).map((aspectRatio) => (
+
+          <fieldset class="mt-3.5">
+            <legend class="text-base-content/60 mb-1.5 text-xs font-medium">
+              Aspect ratio
+            </legend>
+            <div class="grid grid-cols-4 gap-1">
+              {aspectRatios.map((aspectRatio) => (
                 <button
                   key={aspectRatio}
-                  class={`btn btn-sm ${draft.aspectRatio === aspectRatio ? "btn-active" : "btn-outline"}`}
+                  class={`btn btn-xs ${
+                    draft.aspectRatio === aspectRatio
+                      ? "btn-primary"
+                      : "bg-base-100"
+                  }`}
                   type="button"
                   aria-pressed={draft.aspectRatio === aspectRatio}
                   onClick={() => onDraftChange({ ...draft, aspectRatio })}
@@ -213,11 +255,14 @@ export function SettingsSidebar({
               ))}
             </div>
           </fieldset>
-          <fieldset>
-            <legend class="text-xs font-semibold">Images per model</legend>
-            <div class="join mt-2 flex w-full">
+
+          <fieldset class="mt-3.5">
+            <legend class="text-base-content/60 mb-1.5 text-xs font-medium">
+              Images per model
+            </legend>
+            <div class="join flex w-full">
               <button
-                class="btn join-item btn-sm"
+                class="btn btn-xs join-item bg-base-100"
                 type="button"
                 disabled={draft.count <= 1}
                 onClick={() =>
@@ -225,16 +270,16 @@ export function SettingsSidebar({
                 }
                 aria-label="Decrease images per model"
               >
-                -
+                −
               </button>
               <output
-                class="input join-item input-sm flex min-w-0 grow items-center justify-center text-center font-medium"
+                class="bg-base-100 border-base-300 join-item flex min-w-0 grow items-center justify-center border-y text-xs font-medium tabular-nums"
                 aria-live="polite"
               >
                 {draft.count}
               </output>
               <button
-                class="btn join-item btn-sm"
+                class="btn btn-xs join-item bg-base-100"
                 type="button"
                 disabled={draft.count >= 10}
                 onClick={() =>
@@ -246,18 +291,19 @@ export function SettingsSidebar({
               </button>
             </div>
           </fieldset>
-        </div>
-      </section>
-      <details class="collapse collapse-arrow border-base-300 mt-7 border-t">
-        <summary class="collapse-title px-0 py-4 text-sm font-semibold">
-          Output settings
-        </summary>
-        <div class="collapse-content px-0 pb-1">
-          <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-1">
-            <label class="grid gap-2 text-xs font-semibold">
-              Quality
+        </section>
+
+        <details class="border-base-300 mt-6 border-t">
+          <summary class="text-base-content/60 hover:text-base-content marker:text-base-content/30 cursor-pointer py-3 text-xs font-semibold tracking-[0.06em] uppercase transition-colors">
+            Output
+          </summary>
+          <div class="grid gap-3 pb-2">
+            <label class="grid gap-1.5">
+              <span class="text-base-content/60 text-xs font-medium">
+                Quality
+              </span>
               <select
-                class="select select-sm w-full font-normal"
+                class="select select-xs bg-base-100 w-full"
                 value={draft.quality ?? ""}
                 onChange={(event) =>
                   event.currentTarget.value
@@ -277,10 +323,13 @@ export function SettingsSidebar({
                 <option value="high">High</option>
               </select>
             </label>
-            <label class="grid gap-2 text-xs font-semibold">
-              Background
+
+            <label class="grid gap-1.5">
+              <span class="text-base-content/60 text-xs font-medium">
+                Background
+              </span>
               <select
-                class="select select-sm w-full font-normal"
+                class="select select-xs bg-base-100 w-full"
                 value={draft.background ?? ""}
                 onChange={(event) =>
                   event.currentTarget.value
@@ -299,10 +348,13 @@ export function SettingsSidebar({
                 <option value="opaque">Opaque</option>
               </select>
             </label>
-            <label class="grid gap-2 text-xs font-semibold">
-              File format
+
+            <label class="grid gap-1.5">
+              <span class="text-base-content/60 text-xs font-medium">
+                File format
+              </span>
               <select
-                class="select select-sm w-full font-normal"
+                class="select select-xs bg-base-100 w-full"
                 value={draft.outputFormat ?? ""}
                 onChange={(event) =>
                   event.currentTarget.value
@@ -321,10 +373,13 @@ export function SettingsSidebar({
                 <option value="webp">WebP</option>
               </select>
             </label>
-            <label class="grid gap-2 text-xs font-semibold">
-              Compression
+
+            <label class="grid gap-1.5">
+              <span class="text-base-content/60 text-xs font-medium">
+                Compression
+              </span>
               <input
-                class="input input-sm w-full font-normal"
+                class="input input-xs bg-base-100 w-full"
                 type="number"
                 min="0"
                 max="100"
@@ -344,23 +399,22 @@ export function SettingsSidebar({
               />
             </label>
           </div>
-        </div>
-      </details>
-      {(referenceLimitErrors.length > 0 || capabilityWarnings.length > 0) && (
-        <div class="alert alert-warning mt-7 items-start rounded-box py-3 text-xs leading-5">
-          <div>
-            {referenceLimitErrors.map((message) => (
-              <p key={message}>{message}</p>
-            ))}
-            {capabilityWarnings.map((warning) => (
-              <p key={warning}>{warning}</p>
-            ))}
+        </details>
+
+        {(referenceLimitErrors.length > 0 || capabilityWarnings.length > 0) && (
+          <div class="bg-warning/10 text-warning rounded-field mt-5 flex gap-2 p-2.5 text-xs leading-5">
+            <AlertIcon class="mt-0.5 size-3.5 shrink-0" />
+            <div class="min-w-0">
+              {referenceLimitErrors.map((message) => (
+                <p key={message}>{message}</p>
+              ))}
+              {capabilityWarnings.map((warning) => (
+                <p key={warning}>{warning}</p>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
-      <div class="border-base-300 text-base-content/50 mt-7 border-t pt-5 text-xs leading-5">
-        Autosave enabled
+        )}
       </div>
-    </aside>
+    </div>
   );
 }

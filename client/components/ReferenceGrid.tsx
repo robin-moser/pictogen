@@ -5,6 +5,7 @@ import type {
   SessionDetail,
   SessionDraft,
 } from "../../shared/contracts.js";
+import { CloseIcon, ImageIcon, PlusIcon } from "./Icons.js";
 
 type Props = {
   session: SessionDetail;
@@ -21,15 +22,16 @@ export function ReferenceGrid({
 }: Props) {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const references = draft.referenceAssetIds
     .map((id) => session.references.find((reference) => reference.id === id))
     .filter((reference): reference is Asset => Boolean(reference));
-  const slots = Math.max(3, references.length + 1);
+  const full = draft.referenceAssetIds.length >= 20;
 
   async function addFiles(files: FileList | File[]) {
     if (uploading || !files[0]) return;
-    if (draft.referenceAssetIds.length >= 20) {
+    if (full) {
       setUploadError("A draft can include at most 20 reference images.");
       return;
     }
@@ -50,15 +52,26 @@ export function ReferenceGrid({
   }
 
   return (
-    <section aria-labelledby="references-heading">
+    <section
+      class="border-base-300 border-b"
+      aria-labelledby="references-heading"
+    >
       <h2 id="references-heading" class="sr-only">
         Reference images
       </h2>
       <div
+        class={`flex items-center gap-2 px-3 py-2.5 transition-colors ${
+          dragging ? "bg-primary/10" : ""
+        }`}
         tabindex={0}
-        onDragOver={(event) => event.preventDefault()}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
         onDrop={(event) => {
           event.preventDefault();
+          setDragging(false);
           void addFiles(event.dataTransfer?.files ?? []);
         }}
         onPaste={(event) => {
@@ -76,63 +89,62 @@ export function ReferenceGrid({
           accept="image/png,image/jpeg,image/webp"
           onChange={(event) => void addFiles(event.currentTarget.files ?? [])}
         />
-        <ul class="flex gap-2 overflow-x-auto pb-1 lg:h-80 lg:grid lg:grid-rows-3 lg:gap-4 lg:flex-col lg:overflow-x-hidden lg:overflow-y-auto lg:pr-1 lg:pb-0">
-          {Array.from({ length: slots }, (_, index) => {
-            const reference = references[index];
-            return (
-              <li
-                key={reference?.id ?? `placeholder-${index}`}
-                class="relative size-24 shrink-0 overflow-hidden rounded-box lg:h-auto lg:w-full"
+
+        <span
+          class="text-base-content/35 flex shrink-0 items-center gap-1.5 pr-1"
+          title="Reference images"
+        >
+          <ImageIcon class="size-4" />
+          <span class="text-[0.7rem] font-medium tabular-nums">
+            {references.length}
+          </span>
+        </span>
+
+        <ul class="flex min-w-0 grow items-center gap-1.5 overflow-x-auto">
+          {references.map((reference, index) => (
+            <li key={reference.id} class="group/ref relative shrink-0">
+              <img
+                class="border-base-300 rounded-field size-12 border object-cover"
+                src={`/api/assets/${encodeURIComponent(reference.id)}`}
+                alt={`Reference image ${index + 1}`}
+              />
+              <button
+                class="bg-base-100 border-base-300 text-base-content/70 hover:bg-error hover:text-error-content absolute -top-1 -right-1 grid size-4 place-items-center rounded-full border opacity-0 transition group-focus-within/ref:opacity-100 group-hover/ref:opacity-100 max-md:opacity-100"
+                type="button"
+                aria-label={`Remove reference image ${index + 1}`}
+                onClick={() => void onReferenceRemoved(reference.id)}
               >
-                {reference ? (
-                  <div class="border-base-content/30 relative size-full overflow-hidden rounded-box border-2 bg-base-100 shadow-sm">
-                    <img
-                      class="size-full rounded-box object-cover"
-                      src={`/api/assets/${encodeURIComponent(reference.id)}`}
-                      alt={`Reference image ${index + 1}`}
-                    />
-                    <button
-                      class="btn btn-error btn-xs btn-square absolute top-2 right-2 shadow-sm"
-                      type="button"
-                      aria-label={`Remove reference image ${index + 1}`}
-                      onClick={() => void onReferenceRemoved(reference.id)}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ) : index === references.length ? (
-                  <button
-                    class="border-base-content/30 text-base-content/50 hover:border-base-content/35 hover:text-base-content flex size-full flex-col items-center justify-center gap-1 rounded-box border-2 border-dashed bg-base-100 text-xs shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                    type="button"
-                    disabled={uploading || draft.referenceAssetIds.length >= 20}
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    {uploading ? (
-                      <span
-                        class="loading loading-spinner loading-sm"
-                        aria-label="Uploading reference image"
-                      />
-                    ) : (
-                      <>
-                        <span class="text-lg leading-none" aria-hidden="true">
-                          +
-                        </span>
-                        <span>Add</span>
-                      </>
-                    )}{" "}
-                  </button>
-                ) : (
-                  <div
-                    class="size-full rounded-box bg-base-300/60"
-                    aria-hidden="true"
-                  />
-                )}
-              </li>
-            );
-          })}
+                <CloseIcon class="size-2.5" />
+              </button>
+            </li>
+          ))}
+
+          <li class="shrink-0">
+            <button
+              class="border-base-300 text-base-content/40 hover:border-primary/60 hover:text-primary rounded-field grid size-12 place-items-center border border-dashed transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              type="button"
+              disabled={uploading || full}
+              title={full ? "Reference limit reached" : "Add reference image"}
+              aria-label="Add reference image"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {uploading ? (
+                <span class="loading loading-spinner loading-xs" />
+              ) : (
+                <PlusIcon class="size-4" />
+              )}
+            </button>
+          </li>
         </ul>
+
+        {references.length === 0 && !uploading && (
+          <span class="text-base-content/30 hidden shrink-0 pr-1 text-xs sm:block">
+            Drop, paste or click to add references
+          </span>
+        )}
       </div>
-      {uploadError && <p class="text-error mt-2 text-xs">{uploadError}</p>}
+
+      {uploadError && <p class="text-error px-3 pb-2 text-xs">{uploadError}</p>}
     </section>
   );
 }

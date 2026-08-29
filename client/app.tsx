@@ -25,6 +25,29 @@ import { createEmptyDraft } from "../shared/contracts.js";
 
 type ConnectionState = "checking" | "connected" | "unavailable";
 type SaveStatus = "saved" | "pending" | "saving" | "error";
+type Theme = "pictogen-dark" | "pictogen-light";
+
+const themeStorageKey = "pictogen-theme";
+
+function readStoredTheme(): Theme | null {
+  try {
+    const stored = window.localStorage.getItem(themeStorageKey);
+    return stored === "pictogen-dark" || stored === "pictogen-light"
+      ? stored
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function preferredTheme(): Theme {
+  return (
+    readStoredTheme() ??
+    (window.matchMedia("(prefers-color-scheme: light)").matches
+      ? "pictogen-light"
+      : "pictogen-dark")
+  );
+}
 
 function summaryFromDetail(detail: SessionDetail): SessionSummary {
   return {
@@ -69,6 +92,7 @@ export function App() {
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [theme, setTheme] = useState<Theme>(preferredTheme);
 
   const activeSessionRef = useRef<SessionDetail | null>(null);
   const draftRef = useRef(draft);
@@ -78,6 +102,15 @@ export function App() {
   const sessionRequestRef = useRef(0);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const busyItemRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try {
+      window.localStorage.setItem(themeStorageKey, theme);
+    } catch {
+      // A blocked storage write must not break the theme switch.
+    }
+  }, [theme]);
 
   function updateSessionList(detail: SessionDetail) {
     const summary = summaryFromDetail(detail);
@@ -576,12 +609,6 @@ export function App() {
     }
   }
 
-  const status = {
-    checking: { label: "Connecting", indicator: "status-neutral" },
-    connected: { label: "Connected", indicator: "status-success" },
-    unavailable: { label: "Unavailable", indicator: "status-error" },
-  }[connection];
-
   return (
     <div class="drawer lg:drawer-open h-dvh">
       <input
@@ -593,38 +620,19 @@ export function App() {
       />
 
       <div class="drawer-content flex min-h-0 flex-col overflow-hidden">
-        <header class="navbar border-base-300 bg-base-100 min-h-16 border-b px-4 lg:hidden">
-          <div class="navbar-start">
-            <label
-              class="btn btn-ghost btn-square drawer-button"
-              for="session-drawer"
-              aria-label="Open sessions"
-            >
-              <span class="text-lg" aria-hidden="true">
-                ≡
-              </span>
-            </label>
-          </div>
-          <div class="navbar-center font-bold">Pictogen</div>
-          <div class="navbar-end">
-            <span
-              class={`status status-sm ${status.indicator}`}
-              aria-label={status.label}
-            />
-          </div>
-        </header>
-
         {error && (
-          <div class="alert alert-error rounded-none py-2 text-sm" role="alert">
-            <span>{error}</span>
-            <button
-              class="btn btn-ghost btn-xs ml-auto"
-              type="button"
-              aria-label="Dismiss error"
-              onClick={() => setError(null)}
-            >
-              Dismiss
-            </button>
+          <div class="toast toast-center toast-bottom z-50 w-full max-w-md">
+            <div class="alert alert-error text-sm" role="alert">
+              <span class="min-w-0">{error}</span>
+              <button
+                class="btn btn-ghost btn-xs ml-auto shrink-0"
+                type="button"
+                aria-label="Dismiss error"
+                onClick={() => setError(null)}
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         )}
 
@@ -656,7 +664,14 @@ export function App() {
           sessions={sessions}
           activeSessionId={activeSession?.id ?? null}
           user={user}
+          connection={connection}
           busySessionId={busySessionId}
+          theme={theme}
+          onToggleTheme={() =>
+            setTheme((current) =>
+              current === "pictogen-dark" ? "pictogen-light" : "pictogen-dark",
+            )
+          }
           onCreate={handleCreate}
           onOpen={(sessionId) => void handleOpen(sessionId)}
           onRename={handleRename}
