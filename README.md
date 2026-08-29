@@ -7,6 +7,55 @@ and return to named sessions from any browser.
 <img width="1600" height="915" alt="screenshot-pictogen"
     src="https://raw.githubusercontent.com/robin-moser/pictogen/refs/heads/main/public/screenshot.webp" />
 
+## Features
+
+- **Queueing with fair concurrency:** a global queue and per-user limits keep
+  parallel, multi-model runs within the provider budget without allowing one
+  user to monopolize generation capacity.
+- **A live model catalog:** image-capable OpenRouter models are discovered and
+  cached automatically, so the picker follows the provider catalog rather than
+  relying on a manually maintained list.
+- **Capability-aware requests:** Pictogen reads each model's advertised limits
+  and adapts unsupported resolutions, aspect ratios, quality, background,
+  output format, compression, and reference-image counts before generation.
+- **Image filter presets:** compose prompts with built-in shot framing, color
+  treatment, visual effect, and photographic-style presets instead of writing
+  every modifier by hand.
+- **Side-by-side model comparison:** submit one prompt to multiple selected
+  models and review their outputs together in a single session.
+- **Reference-driven iteration:** upload source images for a generation, then
+  reuse any generated output as a reference for the next run.
+- **Saved workspaces:** named sessions preserve drafts and generation history,
+  making it possible to pause a line of work and resume it from any browser.
+- **Cost visibility:** provider-reported cost is stored per image and aggregated
+  into known totals for every session, including when a provider cannot report a
+  complete final price.
+- **Multi-user by design:** local authentication provides administrator-managed
+  accounts and isolated owned data; forward-auth mode delegates identity to an
+  existing trusted proxy.
+- **Durable server-side history:** SQLite, originals, thumbnails, references,
+  session drafts, and generation records persist on the server, surviving
+  browser changes and container restarts.
+- **Focused review tools:** per-model and favorite gallery filters make it
+  easy to compare outputs and keep the results worth revisiting.
+
+## Docker Compose
+
+Create a `.env` file beside `compose.yml` with an OpenRouter API key and a
+local administrator password, then start the published image:
+
+```sh
+OPENROUTER_API_KEY=replace-me
+ADMIN_PASSWORD=choose-at-least-8-characters
+```
+
+```sh
+docker compose up -d
+```
+
+Open `http://localhost:3000`. The named `pictogen-data` volume keeps the
+database and generated images between container updates and restarts.
+
 ## Development
 
 The project requires Node.js 24. Install dependencies, create a `.env` file from
@@ -102,3 +151,9 @@ npm test             # Run automated tests
 npm run build        # Build the production client and server
 npm run user:set-password -- admin # Reset an existing user's password from stdin
 ```
+
+---
+
+Inspired by [imagen-openrouter](https://github.com/yusufipk/imagen-openrouter/).
+
+*This project was developed with AI assist tools.*

@@ -1,0 +1,16 @@
+services:
+  pictogen:
+    image: ghcr.io/robin-moser/pictogen:latest
+    environment:
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      PUBLIC_URL: http://localhost:3000
+      AUTH_MODE: local
+      ADMIN_USERNAME: admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - pictogen-data:/data
+    restart: unless-stopped
+
+volumes:
+  pictogen-data:
