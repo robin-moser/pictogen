@@ -18,14 +18,11 @@ type Props = {
 };
 
 const resolutions = ["512", "1K", "2K", "4K"] as const;
-const aspectRatios = [
-  "1:1",
-  "16:9",
-  "9:16",
-  "4:3",
-  "3:4",
-  "3:2",
-  "2:3",
+const squareAspectRatio = "1:1" as const;
+const aspectRatioPairs = [
+  ["16:9", "9:16"],
+  ["3:2", "2:3"],
+  ["4:3", "3:4"],
 ] as const;
 
 const optionButton = "btn h-11 border-base-300 bg-base-100 font-medium";
@@ -86,10 +83,10 @@ export function SettingsSidebar({
     const rect = anchor.getBoundingClientRect();
     setHint({
       text,
-      left: rect.left - 12,
+      left: rect.left - 18,
       top: Math.min(
-        Math.max(rect.top + rect.height / 2, 72),
-        window.innerHeight - 72,
+        Math.max(rect.top + rect.height / 2, 80),
+        window.innerHeight - 80,
       ),
     });
   }
@@ -277,8 +274,36 @@ export function SettingsSidebar({
             <legend class="text-base-content/55 mb-2 text-xs font-medium">
               Aspect ratio
             </legend>
-            <div class="grid grid-cols-3 gap-2">
-              {aspectRatios.map((aspectRatio) => (
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                class={`col-span-2 ${
+                  draft.aspectRatio === squareAspectRatio
+                    ? optionButtonActive
+                    : optionButton
+                }`}
+                type="button"
+                aria-pressed={draft.aspectRatio === squareAspectRatio}
+                onClick={() =>
+                  onDraftChange({ ...draft, aspectRatio: squareAspectRatio })
+                }
+              >
+                {squareAspectRatio}
+              </button>
+
+              <span
+                class="text-base-content/35 mt-1 text-center text-[0.68rem] font-medium"
+                aria-hidden="true"
+              >
+                Landscape
+              </span>
+              <span
+                class="text-base-content/35 mt-1 text-center text-[0.68rem] font-medium"
+                aria-hidden="true"
+              >
+                Portrait
+              </span>
+
+              {aspectRatioPairs.flat().map((aspectRatio) => (
                 <button
                   key={aspectRatio}
                   class={
@@ -458,7 +483,7 @@ export function SettingsSidebar({
 
       {hint && (
         <div
-          class="bg-base-300 border-base-content/10 rounded-field pointer-events-none fixed z-50 max-w-72 border px-3 py-2 text-xs leading-5 whitespace-pre-line shadow-lg"
+          class="bg-base-300 border-base-content/10 rounded-field pointer-events-none fixed z-50 max-w-80 border px-3 py-2 text-xs leading-5 whitespace-pre-line shadow-lg"
           style={{
             left: `${hint.left}px`,
             top: `${hint.top}px`,
