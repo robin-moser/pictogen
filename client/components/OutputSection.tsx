@@ -99,7 +99,6 @@ export function OutputSection({
       columnSizeRatio: true,
       gap: large.matches ? 16 : 12,
       useResizeObserver: true,
-      observeChildren: true,
     });
     const updateLayout = () => {
       grid.gap = large.matches ? 16 : 12;
