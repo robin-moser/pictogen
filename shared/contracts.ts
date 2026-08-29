@@ -84,8 +84,38 @@ export const promptModifierValues = {
     ", rear projection",
     ", lens flare",
     ", long exposure",
+    ", soft diffused lighting",
+    ", dramatic side lighting",
+    ", rim lighting",
+    ", studio lighting",
+    ", volumetric light rays",
+    ", overcast lighting",
     ", golden hour",
     ", silhouette",
+    ", misty atmosphere",
+    ", rainy weather",
+    ", foggy background",
+    ", urban environment",
+    ", natural landscape",
+    ", studio backdrop",
+    ", calm and serene mood",
+    ", mysterious atmosphere",
+    ", dramatic mood",
+    ", melancholic atmosphere",
+    ", joyful mood",
+    ", rear projection",
+  ],
+  style: [
+    ", 35mm film photography",
+    ", Kodak Portra 400 film",
+    ", Kodak Gold 200 film",
+    ", Kodak Tri-X 400 film",
+    ", Polaroid instant photography",
+    ", medium format photography",
+    ", film noir photography",
+    ", editorial fashion photography",
+    ", documentary photography",
+    ", cinematic photography",
   ],
 } as const;
 
@@ -101,6 +131,7 @@ export const PromptModifiersSchema = Type.Object(
     shot: Type.Optional(promptModifierSchema(promptModifierValues.shot)),
     color: Type.Optional(promptModifierSchema(promptModifierValues.color)),
     effect: Type.Optional(promptModifierSchema(promptModifierValues.effect)),
+    style: Type.Optional(promptModifierSchema(promptModifierValues.style)),
   },
   { additionalProperties: false },
 );
@@ -130,8 +161,8 @@ export const SessionDraftSchema = Type.Object(
 export type SessionDraft = Static<typeof SessionDraftSchema>;
 
 export function composePrompt(draft: SessionDraft): string {
-  const { shot, color, effect } = draft.promptModifiers;
-  return `${draft.prompt}${shot?.join("") ?? ""}${color?.join("") ?? ""}${effect?.join("") ?? ""}`;
+  const { shot, color, effect, style } = draft.promptModifiers;
+  return `${draft.prompt}${shot?.join("") ?? ""}${color?.join("") ?? ""}${effect?.join("") ?? ""}${style?.join("") ?? ""}`;
 }
 
 export function normalizeSessionDraft(draft: SessionDraft): SessionDraft {
@@ -143,7 +174,7 @@ export function normalizeSessionDraft(draft: SessionDraft): SessionDraft {
     Object.values(rawModifiers).some((value) => value !== undefined)
   ) {
     const promptModifiers: SessionDraft["promptModifiers"] = {};
-    for (const key of ["shot", "color", "effect"] as const) {
+    for (const key of ["shot", "color", "effect", "style"] as const) {
       const value = rawModifiers[key];
       if (value !== undefined) {
         promptModifiers[key] = Array.isArray(value) ? value : [value];
@@ -154,7 +185,7 @@ export function normalizeSessionDraft(draft: SessionDraft): SessionDraft {
 
   let prompt = draft.prompt;
   const promptModifiers: SessionDraft["promptModifiers"] = {};
-  for (const key of ["effect", "color", "shot"] as const) {
+  for (const key of ["style", "effect", "color", "shot"] as const) {
     const value = promptModifierValues[key].find((candidate) =>
       prompt.endsWith(candidate),
     );

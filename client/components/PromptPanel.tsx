@@ -2,7 +2,7 @@ import type { ComponentChildren } from "preact";
 
 import { composePrompt } from "../../shared/contracts.js";
 import type { SessionDraft } from "../../shared/contracts.js";
-import { CameraIcon, PaletteIcon, SparklesIcon } from "./Icons.js";
+import { CameraIcon, ImageIcon, PaletteIcon, SparklesIcon } from "./Icons.js";
 
 const modifierKey =
   typeof navigator !== "undefined" &&
@@ -18,20 +18,23 @@ const modifierGroups = [
     badge: "badge-info",
     icon: CameraIcon,
     options: [
+      ["", "Framing", true],
       [", extreme close-up", "extreme close-up"],
+      [", close-up shot", "close-up"],
+      [", close-up portrait", "portrait"],
+      [", wide-angle shot", "wide-angle"],
+      [", establishing shot", "establishing"],
+      [", panoramic shot", "panoramic"],
+      ["", "Angle", true],
       [", low-angle shot", "low-angle"],
       [", high-angle shot", "high-angle"],
       [", aerial shot", "aerial"],
-      [", close-up shot", "close-up"],
-      [", close-up portrait", "portrait"],
-      [", macro shot", "macro"],
-      [", wide-angle shot", "wide-angle"],
-      [", establishing shot", "establishing"],
       [", over-the-shoulder shot", "over-the-shoulder"],
+      [", dramatic angle, extreme angle shot", "dramatic"],
+      ["", "Camera", true],
+      [", macro shot", "macro"],
       [", telephoto shot", "telephoto"],
       [", handheld shot", "handheld"],
-      [", panoramic shot", "panoramic"],
-      [", dramatic angle, extreme angle shot", "dramatic"],
     ],
   },
   {
@@ -42,16 +45,19 @@ const modifierGroups = [
       "[--badge-color:var(--color-rose-800)] dark:[--badge-color:var(--color-rose-300)]",
     icon: PaletteIcon,
     options: [
-      [", vibrant color grading", "vibrant"],
+      ["", "Temperature", true],
       [", warm color grading", "warm"],
       [", cool-toned color grading", "cool"],
-      [", pastel color grading", "pastel"],
+      [", cool-toned sterile colors", "sterile"],
+      ["", "Intensity", true],
+      [", vibrant color grading", "vibrant"],
       [", bright color grading", "bright"],
       [", muted color grading", "muted"],
+      [", pastel color grading", "pastel"],
       [", neon color grading", "neon"],
+      ["", "Treatment", true],
       [", duotone color grading", "duotone"],
       [", monochrome", "monochrome"],
-      [", cool-toned sterile colors", "sterile"],
     ],
   },
   {
@@ -62,17 +68,58 @@ const modifierGroups = [
       "[--badge-color:var(--color-indigo-800)] dark:[--badge-color:var(--color-indigo-300)]",
     icon: SparklesIcon,
     options: [
+      ["", "Focus & lens", true],
       [", bokeh", "bokeh"],
       [", tilt-shift effect", "tilt-shift"],
       [", soft focus", "soft focus"],
       [", shallow depth of field", "background blur"],
       [", chromatic aberrations", "chromatic aberrations"],
       [", light leaks", "light leaks"],
-      [", rear projection", "rear projection"],
       [", lens flare", "lens flare"],
       [", long exposure", "long exposure"],
+      ["", "Lighting", true],
+      [", soft diffused lighting", "soft diffused lighting"],
+      [", dramatic side lighting", "dramatic side lighting"],
+      [", rim lighting", "rim lighting"],
+      [", studio lighting", "studio lighting"],
+      [", volumetric light rays", "volumetric light rays"],
+      [", overcast lighting", "overcast lighting"],
+      ["", "Atmosphere", true],
       [", golden hour", "golden hour"],
       [", silhouette", "silhouette"],
+      [", misty atmosphere", "misty atmosphere"],
+      [", rainy weather", "rainy weather"],
+      [", foggy background", "foggy background"],
+      ["", "Environment", true],
+      [", urban environment", "urban environment"],
+      [", natural landscape", "natural landscape"],
+      [", studio backdrop", "studio backdrop"],
+      ["", "Mood", true],
+      [", calm and serene mood", "calm and serene"],
+      [", mysterious atmosphere", "mysterious"],
+      [", dramatic mood", "dramatic mood"],
+      [", melancholic atmosphere", "melancholic"],
+      [", joyful mood", "joyful"],
+    ],
+  },
+  {
+    key: "style",
+    label: "Add style...",
+    color: "text-green-800 dark:text-green-300",
+    badge:
+      "[--badge-color:var(--color-green-800)] dark:[--badge-color:var(--color-green-300)]",
+    icon: ImageIcon,
+    options: [
+      ["", "Film formats", true],
+      [", 35mm film photography", "35mm film"],
+      [", Kodak Portra 400 film", "Kodak Portra 400"],
+      [", Polaroid instant photography", "Polaroid"],
+      [", medium format photography", "medium format"],
+      ["", "Genres", true],
+      [", film noir photography", "film noir"],
+      [", editorial fashion photography", "editorial fashion"],
+      [", documentary photography", "documentary"],
+      [", cinematic photography", "cinematic"],
     ],
   },
 ] as const;
@@ -203,8 +250,10 @@ export function PromptPanel({
                 }
               >
                 <option value="">{group.label}</option>
-                {group.options.map(([value, label]) => (
-                  <option value={value}>{label}</option>
+                {group.options.map(([value, label, divider]) => (
+                  <option value={value} disabled={divider}>
+                    {label}
+                  </option>
                 ))}
               </select>
             </label>
