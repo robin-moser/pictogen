@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 
 import {
+  ApiError,
   cancelJob,
   clearGenerationLog,
   createSession,
@@ -8,14 +9,16 @@ import {
   deleteAsset,
   deleteSession,
   dismissJob,
-  getIdentity,
   getSession,
   listSessions,
   updateAsset,
   updateSession,
 } from "./api.js";
+import type { AuthMode, Identity } from "./api.js";
+import { ChangePasswordScreen } from "./components/ChangePasswordScreen.js";
 import { GenerationWorkspace } from "./components/GenerationWorkspace.js";
 import { SessionSidebar } from "./components/SessionSidebar.js";
+import { UserManagement } from "./components/UserManagement.js";
 import type {
   SessionDetail,
   SessionDraft,
@@ -79,9 +82,26 @@ function setSessionUrl(sessionId: string | null) {
   window.history.replaceState(null, "", url);
 }
 
-export function App() {
+type AppProps = {
+  identity: Identity;
+  authMode: AuthMode;
+  minimumPasswordLength: number;
+  onAuthenticationRequired: () => void;
+  onLogout: () => void;
+  onPasswordChanged: () => Promise<void>;
+  onIdentityChanged: () => Promise<void>;
+};
+
+export function App({
+  identity,
+  authMode,
+  minimumPasswordLength,
+  onAuthenticationRequired,
+  onLogout,
+  onPasswordChanged,
+  onIdentityChanged,
+}: AppProps) {
   const [connection, setConnection] = useState<ConnectionState>("checking");
-  const [user, setUser] = useState("user");
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [activeSession, setActiveSession] = useState<SessionDetail | null>(
     null,
@@ -91,6 +111,8 @@ export function App() {
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sessionsCollapsed, setSessionsCollapsed] = useState(false);
+  const [managingUsers, setManagingUsers] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(preferredTheme);
 
@@ -194,11 +216,7 @@ export function App() {
 
     async function loadWorkspace() {
       try {
-        const [identity, sessionList] = await Promise.all([
-          getIdentity(controller.signal),
-          listSessions(controller.signal),
-        ]);
-        setUser(identity.user);
+        const sessionList = await listSessions(controller.signal);
         setSessions(sessionList);
         setConnection("connected");
 
@@ -226,6 +244,10 @@ export function App() {
         }
       } catch (loadError) {
         if (!controller.signal.aborted) {
+          if (loadError instanceof ApiError && loadError.status === 401) {
+            onAuthenticationRequired();
+            return;
+          }
           setConnection("unavailable");
           setError(
             loadError instanceof Error
@@ -238,7 +260,7 @@ export function App() {
 
     void loadWorkspace();
     return () => controller.abort();
-  }, []);
+  }, [onAuthenticationRequired]);
 
   useEffect(() => {
     if (saveTimerRef.current) {
@@ -613,6 +635,19 @@ export function App() {
     });
   }
 
+  if (changingPassword && authMode === "local") {
+    return (
+      <ChangePasswordScreen
+        minimumLength={minimumPasswordLength}
+        onChanged={async () => {
+          setChangingPassword(false);
+          await onPasswordChanged();
+        }}
+        onCancel={() => setChangingPassword(false)}
+      />
+    );
+  }
+
   return (
     <div class="drawer h-dvh lg:drawer-open">
       <input
@@ -671,7 +706,7 @@ export function App() {
           collapsed={sessionsCollapsed}
           sessions={sessions}
           activeSessionId={activeSession?.id ?? null}
-          user={user}
+          user={identity.user}
           connection={connection}
           busySessionId={busySessionId}
           theme={theme}
@@ -680,6 +715,12 @@ export function App() {
               current === "pictogen-dark" ? "pictogen-light" : "pictogen-dark",
             )
           }
+          canManageUsers={authMode === "local" && identity.isAdmin}
+          canLogout={authMode === "local"}
+          canChangePassword={authMode === "local"}
+          onManageUsers={() => setManagingUsers(true)}
+          onChangePassword={() => setChangingPassword(true)}
+          onLogout={onLogout}
           onCreate={handleCreate}
           onOpen={(sessionId) => void handleOpen(sessionId)}
           onRename={handleRename}
@@ -688,6 +729,14 @@ export function App() {
           onExpand={() => setSessionsCollapsed(false)}
         />
       </div>
+      {managingUsers && authMode === "local" && identity.isAdmin && (
+        <UserManagement
+          minimumLength={minimumPasswordLength}
+          currentUserId={identity.id}
+          onClose={() => setManagingUsers(false)}
+          onCurrentUserChanged={onIdentityChanged}
+        />
+      )}
     </div>
   );
 }

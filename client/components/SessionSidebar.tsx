@@ -6,11 +6,14 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CloseIcon,
+  KeyIcon,
+  LogoutIcon,
   MoonIcon,
   PencilIcon,
   PlusIcon,
   SunIcon,
   TrashIcon,
+  UsersIcon,
 } from "./Icons.js";
 
 type Theme = "pictogen-dark" | "pictogen-light";
@@ -34,6 +37,12 @@ type SessionSidebarProps = {
   busySessionId: string | null;
   theme: Theme;
   onToggleTheme: () => void;
+  canManageUsers: boolean;
+  canLogout: boolean;
+  canChangePassword: boolean;
+  onManageUsers: () => void;
+  onChangePassword: () => void;
+  onLogout: () => void;
   onCreate: (title: string) => Promise<boolean>;
   onOpen: (sessionId: string) => void;
   onRename: (sessionId: string, title: string) => Promise<boolean>;
@@ -60,6 +69,12 @@ export function SessionSidebar({
   busySessionId,
   theme,
   onToggleTheme,
+  canManageUsers,
+  canLogout,
+  canChangePassword,
+  onManageUsers,
+  onChangePassword,
+  onLogout,
   onCreate,
   onOpen,
   onRename,
@@ -133,6 +148,17 @@ export function SessionSidebar({
             <MoonIcon class="size-4" />
           )}
         </button>
+        {canLogout && (
+          <button
+            class="btn btn-ghost btn-sm btn-square mt-1"
+            type="button"
+            aria-label="Sign out"
+            title="Sign out"
+            onClick={onLogout}
+          >
+            <LogoutIcon class="size-4" />
+          </button>
+        )}
       </div>
 
       <div
@@ -356,8 +382,30 @@ export function SessionSidebar({
           <span class="text-base-content/45 min-w-0 truncate text-xs">
             {user}
           </span>
+          {canChangePassword && (
+            <button
+              class="btn btn-ghost btn-sm btn-square ml-auto shrink-0"
+              type="button"
+              aria-label="Change password"
+              title="Change password"
+              onClick={onChangePassword}
+            >
+              <KeyIcon class="size-4" />
+            </button>
+          )}
+          {canManageUsers && (
+            <button
+              class={`btn btn-ghost btn-sm btn-square shrink-0 ${canChangePassword ? "" : "ml-auto"}`}
+              type="button"
+              aria-label="Manage users"
+              title="Manage users"
+              onClick={onManageUsers}
+            >
+              <UsersIcon class="size-4" />
+            </button>
+          )}
           <button
-            class="btn btn-ghost btn-sm btn-square ml-auto shrink-0"
+            class={`btn btn-ghost btn-sm btn-square shrink-0 ${canManageUsers || canChangePassword ? "" : "ml-auto"}`}
             type="button"
             aria-label={
               theme === "pictogen-dark"
@@ -373,6 +421,17 @@ export function SessionSidebar({
               <MoonIcon class="size-4" />
             )}
           </button>
+          {canLogout && (
+            <button
+              class="btn btn-ghost btn-sm btn-square shrink-0"
+              type="button"
+              aria-label="Sign out"
+              title="Sign out"
+              onClick={onLogout}
+            >
+              <LogoutIcon class="size-4" />
+            </button>
+          )}
         </div>
       </div>
     </aside>

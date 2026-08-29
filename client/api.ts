@@ -14,6 +14,29 @@ type ErrorResponse = {
   };
 };
 
+export type AuthMode = "local" | "forward-auth";
+
+export type AuthConfig = {
+  mode: AuthMode;
+  minimumPasswordLength: number;
+};
+
+export type Identity = {
+  id: string;
+  user: string;
+  isAdmin: boolean;
+  mustChangePassword: boolean;
+};
+
+export type UserAccount = {
+  id: string;
+  username: string;
+  displayName: string;
+  isAdmin: boolean;
+  hasLocalCredentials: boolean;
+  createdAt: string;
+};
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -58,7 +81,70 @@ function jsonRequest(method: string, body: unknown): RequestInit {
 }
 
 export function getIdentity(signal?: AbortSignal) {
-  return request<{ user: string }>("/api/me", { signal: signal ?? null });
+  return request<Identity>("/api/me", { signal: signal ?? null });
+}
+
+export function getAuthConfig(signal?: AbortSignal) {
+  return request<AuthConfig>("/api/auth/config", { signal: signal ?? null });
+}
+
+export function authenticateLocal(credentials: {
+  username: string;
+  password: string;
+}) {
+  return request<{ user: string; mustChangePassword: boolean }>(
+    "/api/auth/login",
+    jsonRequest("POST", credentials),
+  );
+}
+
+export function changePassword(passwords: {
+  currentPassword: string;
+  newPassword: string;
+}) {
+  return request<undefined>(
+    "/api/auth/password",
+    jsonRequest("POST", passwords),
+  );
+}
+
+export function logout() {
+  return request<undefined>("/api/auth/logout", { method: "POST" });
+}
+
+export function listUsers() {
+  return request<UserAccount[]>("/api/users");
+}
+
+export function createUser(account: {
+  username: string;
+  password: string;
+  isAdmin: boolean;
+}) {
+  return request<{ id: string; username: string; isAdmin: boolean }>(
+    "/api/users",
+    jsonRequest("POST", account),
+  );
+}
+
+export function setUserPassword(userId: string, password: string) {
+  return request<undefined>(
+    `/api/users/${encodeURIComponent(userId)}/password`,
+    jsonRequest("POST", { password }),
+  );
+}
+
+export function setUserAdministrator(userId: string, isAdmin: boolean) {
+  return request<undefined>(
+    `/api/users/${encodeURIComponent(userId)}`,
+    jsonRequest("PATCH", { isAdmin }),
+  );
+}
+
+export function deleteUser(userId: string) {
+  return request<undefined>(`/api/users/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+  });
 }
 
 export function listSessions(signal?: AbortSignal) {

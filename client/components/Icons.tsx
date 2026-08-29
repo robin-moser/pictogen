@@ -249,3 +249,29 @@ export function AlertIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function LogoutIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M10 5H5v14h5M14 8l4 4-4 4m4-4H9" />
+    </Icon>
+  );
+}
+
+export function UsersIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.5a3 3 0 0 1 0 5.8M17 14a5 5 0 0 1 3.5 5" />
+    </Icon>
+  );
+}
+
+export function KeyIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="8" cy="12" r="3.5" />
+      <path d="M11.5 12H21m-3 0v3m-3-3v2.5" />
+    </Icon>
+  );
+}
