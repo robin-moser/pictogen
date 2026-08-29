@@ -18,6 +18,11 @@ const AssetParamsSchema = Type.Object({
   assetId: Type.String({ minLength: 1 }),
 });
 
+const UpdateAssetBodySchema = Type.Object(
+  { starred: Type.Boolean() },
+  { additionalProperties: false },
+);
+
 type AssetService = ReturnType<typeof createAssetService>;
 
 function notFound(reply: FastifyReply) {
@@ -150,6 +155,33 @@ export function registerAssetRoutes(
         .send(
           createReadStream(await assetService.thumbnailPath(asset.storagePath)),
         );
+    },
+  );
+
+  app.patch<{ Params: { assetId: string }; Body: { starred: boolean } }>(
+    "/api/assets/:assetId",
+    {
+      schema: {
+        params: AssetParamsSchema,
+        body: UpdateAssetBodySchema,
+        response: { 200: AssetSchema, 404: ErrorResponseSchema },
+      },
+    },
+    (request, reply) => {
+      const ownerId = resolveUser(request);
+      const asset = assetService.findOwnedAsset(
+        request.params.assetId,
+        ownerId,
+      );
+      if (!asset || asset.kind !== "output") return notFound(reply);
+
+      const updated = { ...asset, starred: request.body.starred };
+      database.orm
+        .update(assets)
+        .set({ starred: updated.starred })
+        .where(and(eq(assets.id, updated.id), eq(assets.ownerId, ownerId)))
+        .run();
+      return assetService.assetFromRow(updated);
     },
   );
 

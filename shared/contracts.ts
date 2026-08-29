@@ -182,6 +182,7 @@ export const AssetSchema = Type.Object(
     width: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
     height: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
     blurHash: Type.Union([Type.String({ minLength: 6 }), Type.Null()]),
+    starred: Type.Boolean(),
     createdAt: Type.String(),
   },
   { additionalProperties: false },

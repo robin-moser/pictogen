@@ -9,6 +9,7 @@ import { buildApp } from "../server/app.js";
 import { detectImageType } from "../server/services/assets.js";
 import { parseConfig } from "../server/config.js";
 import { openDatabase } from "../server/db.js";
+import { assets } from "../server/db/schema.js";
 
 const temporaryDirectories: string[] = [];
 afterEach(() => {
@@ -76,6 +77,7 @@ describe("asset API", () => {
       width: 1200,
       height: 600,
       blurHash: expect.any(String),
+      starred: false,
     });
     const assetId = upload.json<{ id: string }>().id;
 
@@ -107,6 +109,66 @@ describe("asset API", () => {
     });
     expect(otherOwner.statusCode).toBe(404);
 
+    await app.close();
+  });
+
+  it("persists output shortlist changes and scopes them to the owner", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "pictogen-assets-"));
+    temporaryDirectories.push(dataDir);
+    const config = parseConfig({
+      NODE_ENV: "test",
+      OPENROUTER_API_KEY: "test-key",
+      DATA_DIR: dataDir,
+    });
+    const database = openDatabase({ databasePath: config.databasePath });
+    const app = await buildApp({ config, database });
+    const aliceHeaders = { "remote-user": "alice" };
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      headers: aliceHeaders,
+      payload: { title: "Shortlist" },
+    });
+    const sessionId = created.json<{ id: string }>().id;
+    const outputId = crypto.randomUUID();
+    database.orm
+      .insert(assets)
+      .values({
+        id: outputId,
+        ownerId: "alice",
+        sessionId,
+        jobId: null,
+        kind: "output",
+        sha256: "test",
+        storagePath: `${outputId}.png`,
+        mimeType: "image/png",
+        bytes: 100,
+        width: 8,
+        height: 8,
+        blurHash: null,
+        starred: false,
+        ordinal: 0,
+        createdAt: new Date().toISOString(),
+      })
+      .run();
+
+    const forbidden = await app.inject({
+      method: "PATCH",
+      url: `/api/assets/${outputId}`,
+      headers: { "remote-user": "bob" },
+      payload: { starred: true },
+    });
+    const starred = await app.inject({
+      method: "PATCH",
+      url: `/api/assets/${outputId}`,
+      headers: aliceHeaders,
+      payload: { starred: true },
+    });
+
+    expect(forbidden.statusCode).toBe(404);
+    expect(starred.statusCode).toBe(200);
+    expect(starred.json()).toMatchObject({ id: outputId, starred: true });
+    expect(database.orm.select().from(assets).get()?.starred).toBe(true);
     await app.close();
   });
 

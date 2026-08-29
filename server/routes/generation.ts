@@ -450,6 +450,7 @@ export function runDetail(database: AppDatabase, runId: string) {
           width: asset.width,
           height: asset.height,
           blurHash: asset.blurHash,
+          starred: asset.starred,
           createdAt: asset.createdAt,
         })),
     }));

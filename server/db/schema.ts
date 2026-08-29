@@ -43,6 +43,7 @@ export const assets = sqliteTable(
     width: integer("width"),
     height: integer("height"),
     blurHash: text("blur_hash"),
+    starred: integer("starred", { mode: "boolean" }).notNull().default(false),
     ordinal: integer("ordinal"),
     createdAt: text("created_at").notNull(),
   },

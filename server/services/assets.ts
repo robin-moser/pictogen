@@ -188,6 +188,7 @@ function assetFromRow(row: AssetRow): Asset {
     width: row.width,
     height: row.height,
     blurHash: row.blurHash,
+    starred: row.starred,
     createdAt: row.createdAt,
   };
 }
@@ -261,6 +262,7 @@ export function createAssetService(config: AppConfig, database: AppDatabase) {
           mimeType: "image/jpeg",
           bytes: normalized.length,
           ...placeholder,
+          starred: false,
           ordinal: null,
           createdAt: new Date().toISOString(),
         };
@@ -314,6 +316,7 @@ export function createAssetService(config: AppConfig, database: AppDatabase) {
           mimeType: imageType.mimeType,
           bytes: bytes.length,
           ...placeholder,
+          starred: false,
           ordinal,
           createdAt: new Date().toISOString(),
         };
