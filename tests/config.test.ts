@@ -51,7 +51,7 @@ describe("parseConfig", () => {
   });
 
   it("accepts exactly one authentication mode", () => {
-    for (const mode of ["", "oidc", "local,forward-auth", "local,"]) {
+    for (const mode of ["", "unsupported", "local,forward-auth", "local,"]) {
       expect(() =>
         parseConfig({ OPENROUTER_API_KEY: "test-key", AUTH_MODE: mode }),
       ).toThrow("AUTH_MODE must be local or forward-auth.");
