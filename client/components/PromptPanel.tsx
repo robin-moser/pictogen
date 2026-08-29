@@ -114,7 +114,7 @@ export function PromptPanel({
       {references}
 
       <textarea
-        class="textarea min-h-32 w-full resize-none rounded-none border-0 bg-transparent px-4 py-3.5 text-[0.95rem] leading-6 focus:outline-none"
+        class="textarea min-h-36 w-full resize-none rounded-none border-0 bg-transparent px-5 py-5 text-[0.95rem] leading-6 focus:outline-none"
         aria-label="Image prompt"
         value={draft.prompt}
         maxLength={12_000}
@@ -132,7 +132,7 @@ export function PromptPanel({
 
       {modifierGroups.some((group) => draft.promptModifiers[group.key]) && (
         <div
-          class="flex min-h-7 flex-wrap items-center gap-1.5 px-4 pb-3"
+          class="flex min-h-7 flex-wrap items-center gap-2 px-5 pb-4"
           aria-label="Added prompt modifiers"
         >
           {modifierGroups.map((group) => {
@@ -146,7 +146,7 @@ export function PromptPanel({
         </div>
       )}
 
-      <div class="border-base-300 flex flex-wrap items-center gap-2 border-t px-3 py-3">
+      <div class="border-base-300 flex flex-wrap items-center gap-2.5 border-t px-4 py-4">
         {modifierGroups.map((group) => (
           <select
             class={`select select-bordered h-11 min-h-11 w-28 text-xs ${group.color}`}

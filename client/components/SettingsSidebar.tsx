@@ -113,7 +113,7 @@ export function SettingsSidebar({
       class="bg-base-200 flex h-full min-h-0 flex-col"
       aria-labelledby="settings-heading"
     >
-      <div class="border-base-300 flex shrink-0 items-center justify-between border-b px-5 py-4">
+      <div class="border-base-300 flex shrink-0 items-center justify-between border-b px-6 py-5">
         <h2 id="settings-heading" class="text-sm font-semibold tracking-tight">
           Settings
         </h2>
@@ -127,7 +127,7 @@ export function SettingsSidebar({
         </button>
       </div>
 
-      <div class="scroll-pane grow px-5 py-6">
+      <div class="scroll-pane grow px-6 py-7">
         <section aria-labelledby="models-heading">
           <div class="mb-3 flex items-baseline justify-between gap-3">
             <h3 id="models-heading" class="field-legend">

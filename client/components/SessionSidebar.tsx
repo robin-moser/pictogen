@@ -83,17 +83,19 @@ export function SessionSidebar({
   }
 
   return (
-    <aside class="border-base-300 bg-base-200 flex min-h-full w-72 flex-col border-r">
-      <div class="flex items-center gap-2.5 px-4 pt-4 pb-3">
+    <aside class="border-base-300 bg-base-200 flex min-h-full w-76 flex-col border-r">
+      <div class="flex items-center gap-3 px-5 pt-5 pb-5">
         <a class="flex min-w-0 items-center gap-2.5" href="/">
           <img
-            class="size-10 shrink-0"
+            class="size-9 shrink-0"
             src="/logo.svg"
             alt=""
             width="38"
             height="38"
           />
-          <span class="text-xl font-semibold">Pictogen</span>
+          <span class="text-lg font-semibold tracking-[-0.025em]">
+            Pictogen
+          </span>
         </a>
         <button
           class="btn btn-ghost btn-sm btn-square ml-auto shrink-0"
@@ -112,7 +114,7 @@ export function SessionSidebar({
       </div>
 
       {creating && (
-        <form class="px-3 pb-3" onSubmit={submitCreate}>
+        <form class="px-4 pb-5" onSubmit={submitCreate}>
           <div class="join w-full">
             <input
               id="new-session-title"
@@ -137,20 +139,20 @@ export function SessionSidebar({
         </form>
       )}
 
-      <div class="flex items-center justify-between px-4 pt-1 pb-2">
+      <div class="flex items-center justify-between px-5 pt-1 pb-3">
         <h2 class="field-legend">Sessions</h2>
         <span class="text-base-content/40 text-xs tabular-nums">
           {sessions.length}
         </span>
       </div>
 
-      <nav class="scroll-pane grow px-2 pb-3" aria-label="Saved sessions">
+      <nav class="scroll-pane grow px-3 pb-5" aria-label="Saved sessions">
         {sessions.length === 0 ? (
           <p class="text-base-content/40 px-2 py-6 text-center text-xs">
             No sessions yet.
           </p>
         ) : (
-          <ul class="flex flex-col gap-0.5">
+          <ul class="flex flex-col gap-1.5">
             {sessions.map((session) => {
               const active = session.id === activeSessionId;
               const editing = session.id === editingId;
@@ -201,7 +203,7 @@ export function SessionSidebar({
               return (
                 <li key={session.id} class="group/session relative">
                   <button
-                    class={`rounded-field flex w-full min-w-0 flex-col items-stretch gap-1 py-2.5 pr-20 pl-3 text-left transition-colors ${
+                    class={`rounded-field flex w-full min-w-0 flex-col items-stretch gap-1.5 py-3 pr-20 pl-3.5 text-left transition-colors ${
                       active
                         ? "bg-base-300 text-base-content"
                         : "hover:bg-base-300/50"
@@ -282,7 +284,7 @@ export function SessionSidebar({
         )}
       </nav>
 
-      <div class="border-base-300 flex items-center gap-2.5 border-t px-4 py-3">
+      <div class="border-base-300 flex items-center gap-2.5 border-t px-5 py-4">
         <span
           class={`status status-md shrink-0 ${connectionStates[connection].dot}`}
           title={connectionStates[connection].label}

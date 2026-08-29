@@ -97,12 +97,12 @@ export function OutputSection({
       align: "stretch",
       column: columns,
       columnSizeRatio: true,
-      gap: large.matches ? 12 : 8,
+      gap: large.matches ? 16 : 12,
       useResizeObserver: true,
       observeChildren: true,
     });
     const updateLayout = () => {
-      grid.gap = large.matches ? 12 : 8;
+      grid.gap = large.matches ? 16 : 12;
       grid.renderItems({ useOrgResize: true });
     };
 
@@ -153,14 +153,14 @@ export function OutputSection({
 
   if (!session.runs.length)
     return (
-      <p class="text-base-content/25 py-10 text-center text-xs">
+      <p class="text-base-content/30 py-16 text-center text-xs">
         No images yet.
       </p>
     );
 
   return (
-    <section class="pt-3" aria-labelledby="gallery-heading">
-      <div class="mb-2.5 flex items-center gap-3">
+    <section class="pt-6" aria-labelledby="gallery-heading">
+      <div class="mb-4 flex items-center gap-3">
         <h2 id="gallery-heading" class="field-legend flex items-center gap-1.5">
           Gallery
           <span class="text-base-content/30 tabular-nums">
@@ -228,7 +228,7 @@ export function OutputSection({
       )}
 
       {failures.length > 0 && (
-        <details class="border-base-300 bg-base-200 rounded-box mt-3 border">
+        <details class="border-base-300 bg-base-200 rounded-box mt-5 border">
           <summary class="text-base-content/60 hover:text-base-content flex cursor-pointer items-center gap-2 px-3 py-2.5 text-xs font-medium transition-colors">
             Generation log
             <span class="badge badge-error badge-xs">{failures.length}</span>

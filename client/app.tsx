@@ -24,7 +24,6 @@ import type {
 import { composePrompt, createEmptyDraft } from "../shared/contracts.js";
 
 type ConnectionState = "checking" | "connected" | "unavailable";
-type SaveStatus = "saved" | "pending" | "saving" | "error";
 type Theme = "pictogen-dark" | "pictogen-light";
 
 const themeStorageKey = "pictogen-theme";
@@ -87,7 +86,6 @@ export function App() {
     null,
   );
   const [draft, setDraft] = useState<SessionDraft>(createEmptyDraft);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [busySessionId, setBusySessionId] = useState<string | null>(null);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -130,13 +128,11 @@ export function App() {
       draftRef.current = detail.draft;
       persistedDraftRef.current = JSON.stringify(detail.draft);
       setDraft(detail.draft);
-      setSaveStatus("saved");
     } else {
       const emptyDraft = createEmptyDraft();
       draftRef.current = emptyDraft;
       persistedDraftRef.current = "";
       setDraft(emptyDraft);
-      setSaveStatus("saved");
     }
   }
 
@@ -153,7 +149,6 @@ export function App() {
       return true;
     }
 
-    setSaveStatus("saving");
     const save = updateSession(session.id, { draft: draftToSave })
       .then((updated) => {
         persistedDraftRef.current = serializedDraft;
@@ -163,17 +158,11 @@ export function App() {
           const currentDetail = { ...updated, draft: draftRef.current };
           activeSessionRef.current = currentDetail;
           setActiveSession(currentDetail);
-          setSaveStatus(
-            JSON.stringify(draftRef.current) === serializedDraft
-              ? "saved"
-              : "pending",
-          );
         }
 
         return true;
       })
       .catch((saveError: unknown) => {
-        setSaveStatus("error");
         setError(
           saveError instanceof Error
             ? saveError.message
@@ -258,7 +247,6 @@ export function App() {
       return;
     }
 
-    setSaveStatus("pending");
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null;
       void saveCurrentDraft();
@@ -496,16 +484,6 @@ export function App() {
     }
   }
 
-  async function handleClose() {
-    if (!(await flushDraft())) {
-      return;
-    }
-
-    sessionRequestRef.current += 1;
-    activate(null);
-    setSessionUrl(null);
-  }
-
   async function handleRename(sessionId: string, title: string) {
     try {
       setError(null);
@@ -655,9 +633,7 @@ export function App() {
         <GenerationWorkspace
           session={activeSession}
           draft={draft}
-          saveStatus={saveStatus}
           onDraftChange={changeDraft}
-          onClose={() => void handleClose()}
           onCreate={() => void handleCreate("Untitled session")}
           onReferenceUploaded={handleReferenceUploaded}
           onReferenceRemoved={handleReferenceRemoved}

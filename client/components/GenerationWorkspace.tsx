@@ -7,7 +7,7 @@ import type {
   SessionDetail,
   SessionDraft,
 } from "../../shared/contracts.js";
-import { CloseIcon, MenuIcon, SlidersIcon } from "./Icons.js";
+import { MenuIcon, SlidersIcon } from "./Icons.js";
 import { OutputSection } from "./OutputSection.js";
 import { PromptPanel } from "./PromptPanel.js";
 import { ReferenceGrid } from "./ReferenceGrid.js";
@@ -31,13 +31,10 @@ function useWideLayout() {
   return wide;
 }
 
-type SaveStatus = "saved" | "pending" | "saving" | "error";
 type Props = {
   session: SessionDetail | null;
   draft: SessionDraft;
-  saveStatus: SaveStatus;
   onDraftChange: (draft: SessionDraft) => void;
-  onClose: () => void;
   onCreate: () => void;
   onReferenceUploaded: (asset: Asset) => void;
   onReferenceRemoved: (assetId: string) => Promise<boolean>;
@@ -54,26 +51,10 @@ type Props = {
   onClearGenerationLog: () => void;
 };
 
-const saveLabels: Record<SaveStatus, string> = {
-  saved: "Saved",
-  pending: "Unsaved",
-  saving: "Saving",
-  error: "Save failed",
-};
-
-const saveDots: Record<SaveStatus, string> = {
-  saved: "status-success",
-  pending: "status-warning",
-  saving: "status-info",
-  error: "status-error",
-};
-
 export function GenerationWorkspace({
   session,
   draft,
-  saveStatus,
   onDraftChange,
-  onClose,
   onCreate,
   onReferenceUploaded,
   onReferenceRemoved,
@@ -150,20 +131,26 @@ export function GenerationWorkspace({
 
   if (!session)
     return (
-      <main class="surface-canvas relative grid min-h-0 grow place-items-center overflow-y-auto p-6">
+      <main class="empty-workspace relative grid min-h-0 grow place-items-center overflow-hidden p-6">
         <label
-          class="btn btn-ghost btn-sm btn-square drawer-button absolute top-3 left-3 lg:hidden"
+          class="btn border-base-content/10 bg-base-100/80 btn-sm btn-square drawer-button absolute top-4 left-4 shadow-sm backdrop-blur lg:hidden"
           for="session-drawer"
           aria-label="Open sessions"
         >
           <MenuIcon class="size-4" />
         </label>
-        <section class="text-center">
-          <h1 class="text-base-content/70 text-lg font-medium tracking-tight">
-            No session selected
+        <section class="relative flex max-w-sm flex-col items-center text-center">
+          <div class="empty-canvas-mark mb-8" aria-hidden="true">
+            <span class="empty-canvas-focus" />
+          </div>
+          <h1 class="text-base-content text-xl font-semibold tracking-[-0.025em]">
+            Start a new image session
           </h1>
+          <p class="text-base-content/45 mt-2 text-sm leading-6">
+            Choose a saved session or create a new one.
+          </p>
           <button
-            class="btn btn-primary btn-sm mt-4"
+            class="btn btn-primary mt-6 min-w-32"
             type="button"
             onClick={onCreate}
           >
@@ -173,73 +160,32 @@ export function GenerationWorkspace({
       </main>
     );
 
-  const imageCount = session.runs.reduce(
-    (total, run) =>
-      total +
-      run.jobs.reduce((jobTotal, job) => jobTotal + job.outputs.length, 0),
-    0,
-  );
-  const cost = `$${(session.knownCostMicrousd / 1_000_000).toFixed(2)}`;
-
   return (
-    <main class="surface-canvas flex min-h-0 grow flex-col">
-      <header class="border-base-300 bg-base-200 flex min-h-14 shrink-0 items-center gap-3 border-b px-3 sm:px-4">
+    <main class="surface-canvas relative flex min-h-0 grow flex-col">
+      <div class="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between p-4 xl:hidden">
         <label
-          class="btn btn-ghost btn-sm btn-square drawer-button lg:hidden"
+          class="btn border-base-content/10 bg-base-100/85 btn-sm btn-square drawer-button pointer-events-auto shadow-sm backdrop-blur lg:hidden"
           for="session-drawer"
           aria-label="Open sessions"
         >
           <MenuIcon class="size-4" />
         </label>
-
-        <div class="min-w-0">
-          <h1 class="truncate text-sm font-semibold tracking-tight">
-            {session.title}
-          </h1>
-          <p class="text-base-content/40 truncate text-[0.7rem] tabular-nums">
-            {imageCount} image{imageCount === 1 ? "" : "s"} · {cost}
-            {session.costComplete ? "" : " known"}
-          </p>
-        </div>
-
-        <div class="ml-auto flex shrink-0 items-center gap-1">
-          <span
-            class="text-base-content/45 mr-1 flex items-center gap-1.5 text-xs"
-            role="status"
-            aria-live="polite"
-            title={saveLabels[saveStatus]}
-          >
-            <span class={`status status-sm ${saveDots[saveStatus]}`} />
-            <span class="hidden sm:inline">{saveLabels[saveStatus]}</span>
-          </span>
-
-          <button
-            class="btn btn-ghost btn-sm btn-square xl:hidden"
-            type="button"
-            aria-label="Open settings"
-            aria-expanded={settingsOpen}
-            title="Settings"
-            onClick={() => setSettingsOpen(true)}
-          >
-            <SlidersIcon class="size-4" />
-          </button>
-
-          <button
-            class="btn btn-ghost btn-sm btn-square"
-            type="button"
-            aria-label="Close session"
-            title="Close session"
-            onClick={onClose}
-          >
-            <CloseIcon class="size-4" />
-          </button>
-        </div>
-      </header>
+        <button
+          class="btn border-base-content/10 bg-base-100/85 btn-sm btn-square pointer-events-auto ml-auto shadow-sm backdrop-blur"
+          type="button"
+          aria-label="Open settings"
+          aria-expanded={settingsOpen}
+          title="Settings"
+          onClick={() => setSettingsOpen(true)}
+        >
+          <SlidersIcon class="size-4" />
+        </button>
+      </div>
 
       <div class="flex min-h-0 grow">
         <div class="flex min-w-0 grow flex-col">
           {!outputExpanded && (
-            <div class="shrink-0 px-3 pt-3 sm:px-4 sm:pt-4">
+            <div class="shrink-0 px-4 pt-18 sm:px-6 lg:px-8 xl:pt-8">
               <PromptPanel
                 draft={draft}
                 references={
@@ -258,7 +204,9 @@ export function GenerationWorkspace({
             </div>
           )}
 
-          <div class="scroll-pane grow px-3 pb-4 sm:px-4">
+          <div
+            class={`scroll-pane grow px-4 pb-8 sm:px-6 lg:px-8 ${outputExpanded ? "pt-14 xl:pt-0" : ""}`}
+          >
             <OutputSection
               session={session}
               columns={galleryColumns}
@@ -291,9 +239,11 @@ export function GenerationWorkspace({
           <aside
             class={
               wideLayout
-                ? "border-base-300 w-88 shrink-0 border-l"
-                : `border-base-300 fixed inset-y-0 right-0 z-40 w-88 max-w-[88vw] border-l transition-transform duration-200 ${
-                    settingsOpen ? "translate-x-0" : "translate-x-full"
+                ? "border-base-300 m-4 ml-0 w-88 shrink-0 overflow-hidden rounded-box border shadow-sm"
+                : `border-base-300 fixed top-3 right-3 bottom-3 z-40 w-88 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-box border shadow-xl transition-transform duration-200 ${
+                    settingsOpen
+                      ? "translate-x-0"
+                      : "translate-x-[calc(100%+0.75rem)]"
                   }`
             }
             aria-hidden={!wideLayout && !settingsOpen ? "true" : undefined}
