@@ -86,12 +86,13 @@ export function SessionSidebar({
     <aside class="border-base-300 bg-base-200 flex min-h-full w-72 flex-col border-r">
       <div class="flex items-center gap-2.5 px-4 pt-4 pb-3">
         <a class="flex min-w-0 items-center gap-2.5" href="/">
-          <span
-            class="bg-primary text-primary-content grid size-7 shrink-0 place-items-center rounded-field text-[0.7rem] font-bold tracking-tight"
-            aria-hidden="true"
-          >
-            PG
-          </span>
+          <img
+            class="size-7 shrink-0"
+            src="/logo.svg"
+            alt=""
+            width="28"
+            height="28"
+          />
           <span class="truncate text-sm font-semibold tracking-tight">
             Pictogen
           </span>
