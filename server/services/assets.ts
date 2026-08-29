@@ -3,6 +3,8 @@ import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
 
 import { and, eq } from "drizzle-orm";
+import decodeHeic from "heic-decode";
+import sharp, { type Sharp } from "sharp";
 
 import type { Asset } from "../../shared/contracts.js";
 import type { AppConfig } from "../config.js";
@@ -19,6 +21,51 @@ type ImageType = (typeof imageTypes)[keyof typeof imageTypes];
 type AssetRow = typeof assets.$inferSelect;
 
 export class AssetValidationError extends Error {}
+
+const acceptedUploadMessage = "Upload a JPEG, PNG, WebP, HEIC, or AVIF image.";
+
+function isHeic(bytes: Buffer) {
+  if (bytes.length < 12 || bytes.toString("ascii", 4, 8) !== "ftyp") {
+    return false;
+  }
+  const heicBrands = new Set(["heic", "heix", "hevc", "hevx", "heim", "heis"]);
+  for (let offset = 8; offset + 4 <= Math.min(bytes.length, 64); offset += 4) {
+    if (heicBrands.has(bytes.toString("ascii", offset, offset + 4)))
+      return true;
+  }
+  return false;
+}
+
+async function normalizeReference(bytes: Buffer) {
+  let image: Sharp;
+  if (isHeic(bytes)) {
+    const decoded = await decodeHeic({ buffer: bytes });
+    image = sharp(Buffer.from(decoded.data), {
+      raw: { width: decoded.width, height: decoded.height, channels: 4 },
+    });
+  } else {
+    image = sharp(bytes, { failOn: "error" });
+    const metadata = await image.metadata();
+    if (
+      !metadata.format ||
+      !["jpeg", "png", "webp", "heif"].includes(metadata.format)
+    ) {
+      throw new AssetValidationError(acceptedUploadMessage);
+    }
+    image = image.rotate();
+  }
+
+  return image
+    .resize({
+      width: 1200,
+      height: 1200,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .flatten({ background: "#ffffff" })
+    .jpeg({ quality: 70 })
+    .toBuffer();
+}
 
 export function detectImageType(bytes: Buffer): ImageType | null {
   if (
@@ -99,17 +146,20 @@ export function createAssetService(config: AppConfig, database: AppDatabase) {
         );
       }
 
-      const imageType = detectImageType(bytes);
-      if (!imageType) {
-        throw new AssetValidationError("Upload a PNG, JPEG, or WebP image.");
+      let normalized: Buffer;
+      try {
+        normalized = await normalizeReference(bytes);
+      } catch (error) {
+        if (error instanceof AssetValidationError) throw error;
+        throw new AssetValidationError(acceptedUploadMessage);
       }
 
       const id = randomUUID();
-      const storagePath = `${id}.${imageType.extension}`;
+      const storagePath = `${id}.jpg`;
       const path = safeAssetPath(config, storagePath);
       const temporaryPath = `${path}.tmp`;
       await mkdir(dirname(path), { recursive: true });
-      await writeFile(temporaryPath, bytes, { flag: "wx" });
+      await writeFile(temporaryPath, normalized, { flag: "wx" });
 
       try {
         await rename(temporaryPath, path);
@@ -119,10 +169,10 @@ export function createAssetService(config: AppConfig, database: AppDatabase) {
           sessionId,
           jobId: null,
           kind: "reference",
-          sha256: createHash("sha256").update(bytes).digest("hex"),
+          sha256: createHash("sha256").update(normalized).digest("hex"),
           storagePath,
-          mimeType: imageType.mimeType,
-          bytes: bytes.length,
+          mimeType: "image/jpeg",
+          bytes: normalized.length,
           ordinal: null,
           createdAt: new Date().toISOString(),
         };

@@ -3,14 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
+import sharp from "sharp";
 
 import { buildApp } from "../server/app.js";
 import { parseConfig } from "../server/config.js";
 import { openDatabase } from "../server/db.js";
 
 const temporaryDirectories: string[] = [];
-const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
@@ -33,6 +32,16 @@ function multipart(sessionId: string, image: Buffer) {
 
 describe("asset API", () => {
   it("stores valid uploads privately and scopes their access to the owner", async () => {
+    const png = await sharp({
+      create: {
+        width: 1600,
+        height: 800,
+        channels: 4,
+        background: { r: 20, g: 40, b: 60, alpha: 0.5 },
+      },
+    })
+      .png()
+      .toBuffer();
     const dataDir = mkdtempSync(join(tmpdir(), "pictogen-assets-"));
     temporaryDirectories.push(dataDir);
     const config = parseConfig({
@@ -62,8 +71,7 @@ describe("asset API", () => {
     expect(upload.json()).toMatchObject({
       sessionId,
       kind: "reference",
-      mimeType: "image/png",
-      bytes: png.length,
+      mimeType: "image/jpeg",
     });
     const assetId = upload.json<{ id: string }>().id;
 
@@ -87,7 +95,12 @@ describe("asset API", () => {
 
     expect(asset.statusCode).toBe(200);
     expect(asset.headers["cache-control"]).toBe("private");
-    expect(asset.rawPayload).toEqual(png);
+    expect(asset.headers["content-type"]).toContain("image/jpeg");
+    expect(await sharp(asset.rawPayload).metadata()).toMatchObject({
+      format: "jpeg",
+      width: 1200,
+      height: 600,
+    });
     expect(otherOwner.statusCode).toBe(404);
 
     await app.close();
@@ -122,7 +135,7 @@ describe("asset API", () => {
     expect(upload.json()).toEqual({
       error: {
         code: "ASSET_INVALID",
-        message: "Upload a PNG, JPEG, or WebP image.",
+        message: "Upload a JPEG, PNG, WebP, HEIC, or AVIF image.",
       },
     });
     await app.close();

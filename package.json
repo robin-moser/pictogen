@@ -31,7 +31,9 @@
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.12.1",
-    "preact": "^10.29.8"
+    "heic-decode": "^2.1.0",
+    "preact": "^10.29.8",
+    "sharp": "^0.35.4"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

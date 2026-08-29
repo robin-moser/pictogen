@@ -100,7 +100,7 @@ export function ReferenceGrid({
           ref={fileInputRef}
           class="sr-only"
           type="file"
-          accept="image/png,image/jpeg,image/webp"
+          accept="image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif,.heic,.heif"
           onChange={(event) => void addFiles(event.currentTarget.files ?? [])}
         />
 
