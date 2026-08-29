@@ -58,12 +58,10 @@ export function OutputSection({
   const [lightboxControlsVisible, setLightboxControlsVisible] = useState(true);
   const [revealedItemId, setRevealedItemId] = useState<string | null>(null);
   const [starredOnly, setStarredOnly] = useState(false);
-  const [runFilter, setRunFilter] = useState("all");
   const [modelFilter, setModelFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState("all");
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
   const galleryRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
     x: number;
@@ -78,22 +76,29 @@ export function OutputSection({
   const failures = jobs.filter(({ job }) => job.status === "failed");
   const models = Array.from(
     new Map(
-      jobs.map(({ job }) => [
-        `${job.providerId}:${job.modelId}`,
-        { key: `${job.providerId}:${job.modelId}`, name: job.modelName },
-      ]),
+      jobs.flatMap(({ job }) =>
+        job.outputs.length > 0 &&
+        job.status !== "failed" &&
+        job.status !== "cancelled"
+          ? [
+              [
+                `${job.providerId}:${job.modelId}`,
+                {
+                  key: `${job.providerId}:${job.modelId}`,
+                  name: job.modelName,
+                },
+              ] as const,
+            ]
+          : [],
+      ),
     ).values(),
   );
-  const dateCutoff = getDateCutoff(dateFilter);
-  const filteredJobs = jobs.filter(({ job, run }) => {
-    if (runFilter !== "all" && run.id !== runFilter) return false;
+  const modelKey = models.map((model) => model.key).join(":");
+  const filteredJobs = jobs.filter(({ job }) => {
     if (
       modelFilter !== "all" &&
       `${job.providerId}:${job.modelId}` !== modelFilter
     )
-      return false;
-    if (statusFilter !== "all" && job.status !== statusFilter) return false;
-    if (dateCutoff && new Date(job.createdAt).getTime() < dateCutoff)
       return false;
     return !starredOnly || job.outputs.some((output) => output.starred);
   });
@@ -130,16 +135,22 @@ export function OutputSection({
   const lightboxKey = lightboxItems.map(({ output }) => output.id).join(":");
 
   useEffect(() => {
-    setRunFilter("all");
     setModelFilter("all");
-    setStatusFilter("all");
-    setDateFilter("all");
     setStarredOnly(false);
   }, [session.id]);
 
   useEffect(() => {
+    if (
+      modelFilter !== "all" &&
+      !models.some((model) => model.key === modelFilter)
+    )
+      setModelFilter("all");
+  }, [modelFilter, modelKey]);
+
+  useEffect(() => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
+    setDragging(false);
     dragRef.current = null;
   }, [lightboxId]);
 
@@ -225,16 +236,40 @@ export function OutputSection({
 
   return (
     <section class="pt-6" aria-labelledby="gallery-heading">
-      <div class="mb-3 flex items-center gap-3">
-        <h2 id="gallery-heading" class="field-legend flex items-center gap-1.5">
-          Gallery
+      <div class="mb-4 flex items-center gap-2 overflow-x-auto pb-1">
+        <button
+          class={`btn btn-sm btn-soft xborder-base-300 font-medium shrink-0 ${starredOnly ? "btn-outline" : ""}`}
+          type="button"
+          aria-pressed={starredOnly}
+          onClick={() => setStarredOnly((current) => !current)}
+        >
+          <StarIcon class={`size-3.5 ${starredOnly ? "fill-current" : ""}`} />
+          Favorites
+        </button>
+        <select
+          class="select select-sm w-36 shrink-0"
+          aria-label="Filter gallery by model"
+          value={modelFilter}
+          onChange={(event) => setModelFilter(event.currentTarget.value)}
+        >
+          <option value="all">All models</option>
+          {models.map((model) => (
+            <option key={model.key} value={model.key}>
+              {model.name}
+            </option>
+          ))}
+        </select>
+        <h2
+          id="gallery-heading"
+          class="field-legend flex shrink-0 ml-auto items-center gap-1.5"
+        >
           <span class="text-base-content/30 tabular-nums">
-            {lightboxItems.length}
+            {lightboxItems.length} Images
           </span>
         </h2>
 
         <label
-          class="text-base-content/35 hover:text-base-content/60 ml-auto flex items-center gap-2 transition-colors"
+          class="text-base-content/35 hover:text-base-content/60 ml-auto flex shrink-0 items-center gap-2 transition-colors"
           title="Images per line"
         >
           <GridIcon class="size-3.5" />
@@ -268,67 +303,6 @@ export function OutputSection({
             <ExpandIcon class="size-3.5" />
           )}
         </button>
-      </div>
-
-      <div class="mb-4 flex items-center gap-2 overflow-x-auto pb-1">
-        <button
-          class={`btn btn-xs shrink-0 ${starredOnly ? "btn-primary" : "btn-ghost"}`}
-          type="button"
-          aria-pressed={starredOnly}
-          onClick={() => setStarredOnly((current) => !current)}
-        >
-          <StarIcon class={`size-3.5 ${starredOnly ? "fill-current" : ""}`} />
-          Shortlist
-        </button>
-        <select
-          class="select select-xs w-auto max-w-40 shrink-0"
-          aria-label="Filter by run"
-          value={runFilter}
-          onChange={(event) => setRunFilter(event.currentTarget.value)}
-        >
-          <option value="all">All runs</option>
-          {session.runs.map((run, index) => (
-            <option key={run.id} value={run.id}>
-              Run {session.runs.length - index} ·{" "}
-              {formatShortDate(run.createdAt)}
-            </option>
-          ))}
-        </select>
-        <select
-          class="select select-xs w-auto max-w-44 shrink-0"
-          aria-label="Filter by model"
-          value={modelFilter}
-          onChange={(event) => setModelFilter(event.currentTarget.value)}
-        >
-          <option value="all">All models</option>
-          {models.map((model) => (
-            <option key={model.key} value={model.key}>
-              {model.name}
-            </option>
-          ))}
-        </select>
-        <select
-          class="select select-xs w-auto shrink-0"
-          aria-label="Filter by status"
-          value={statusFilter}
-          onChange={(event) => setStatusFilter(event.currentTarget.value)}
-        >
-          <option value="all">All statuses</option>
-          <option value="succeeded">Succeeded</option>
-          <option value="running">Running</option>
-          <option value="queued">Queued</option>
-        </select>
-        <select
-          class="select select-xs w-auto shrink-0"
-          aria-label="Filter by date"
-          value={dateFilter}
-          onChange={(event) => setDateFilter(event.currentTarget.value)}
-        >
-          <option value="all">Any date</option>
-          <option value="today">Today</option>
-          <option value="7d">Last 7 days</option>
-          <option value="30d">Last 30 days</option>
-        </select>
       </div>
 
       {galleryItems.length > 0 && (
@@ -430,11 +404,11 @@ export function OutputSection({
               }}
               onWheel={(event) => {
                 event.preventDefault();
-                changeZoom(zoom + (event.deltaY < 0 ? 0.25 : -0.25));
+                changeZoom(zoom + (event.deltaY < 0 ? 0.15 : -0.15));
               }}
             >
               <img
-                class="block max-h-[88vh] max-w-[92vw] select-none object-contain"
+                class={`block max-h-[88vh] max-w-[92vw] select-none object-contain ${dragging ? "" : "transition-transform duration-150 ease-out"}`}
                 style={{
                   transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                 }}
@@ -459,6 +433,7 @@ export function OutputSection({
                 }}
                 onPointerDown={(event) => {
                   if (zoom === 1) return;
+                  setDragging(true);
                   event.currentTarget.setPointerCapture(event.pointerId);
                   dragRef.current = {
                     x: event.clientX,
@@ -475,8 +450,14 @@ export function OutputSection({
                     y: drag.panY + event.clientY - drag.y,
                   });
                 }}
-                onPointerUp={() => (dragRef.current = null)}
-                onPointerCancel={() => (dragRef.current = null)}
+                onPointerUp={() => {
+                  setDragging(false);
+                  dragRef.current = null;
+                }}
+                onPointerCancel={() => {
+                  setDragging(false);
+                  dragRef.current = null;
+                }}
               />
               {lightboxControlsVisible && (
                 <>
@@ -525,8 +506,8 @@ export function OutputSection({
                     }
                     aria-label={
                       lightboxImage.output.starred
-                        ? "Remove image from shortlist"
-                        : "Add image to shortlist"
+                        ? "Remove image from Favorites"
+                        : "Add image to Favorites"
                     }
                   >
                     <StarIcon
@@ -554,7 +535,7 @@ export function OutputSection({
                   class="btn btn-sm btn-square join-item border-white/15 bg-black/60 text-white hover:bg-black"
                   type="button"
                   disabled={zoom <= 1}
-                  onClick={() => changeZoom(zoom - 0.25)}
+                  onClick={() => changeZoom(zoom - 0.15)}
                   aria-label="Zoom out"
                 >
                   <ZoomOutIcon class="size-4" />
@@ -571,7 +552,7 @@ export function OutputSection({
                   class="btn btn-sm btn-square join-item border-white/15 bg-black/60 text-white hover:bg-black"
                   type="button"
                   disabled={zoom >= 4}
-                  onClick={() => changeZoom(zoom + 0.25)}
+                  onClick={() => changeZoom(zoom + 0.15)}
                   aria-label="Zoom in"
                 >
                   <ZoomInIcon class="size-4" />
@@ -727,21 +708,6 @@ function GalleryItem({
           {output ? (
             <>
               <button
-                class={`btn btn-xs btn-square border-white/15 bg-black/60 hover:bg-black ${output.starred ? "text-warning" : "text-white"}`}
-                type="button"
-                disabled={actionsBusy}
-                onClick={onToggleStar}
-                aria-label={
-                  output.starred
-                    ? `Remove image from shortlist`
-                    : `Add image to shortlist`
-                }
-              >
-                <StarIcon
-                  class={`size-3.5 ${output.starred ? "fill-current" : ""}`}
-                />
-              </button>
-              <button
                 class="btn btn-xs btn-square border-white/15 bg-black/60 text-white hover:bg-black"
                 type="button"
                 onClick={onRestore}
@@ -779,6 +745,21 @@ function GalleryItem({
                 ) : (
                   <TrashIcon class="size-3.5" />
                 )}
+              </button>
+              <button
+                class={`btn btn-ghost btn-sm btn-square absolute top-2 left-2 border-0 bg-transparent hover:bg-transparent ${output.starred ? "text-warning" : "text-white"}`}
+                type="button"
+                disabled={actionsBusy}
+                onClick={onToggleStar}
+                aria-label={
+                  output.starred
+                    ? "Remove image from Favorites"
+                    : "Add image to Favorites"
+                }
+              >
+                <StarIcon
+                  class={`size-5 ${output.starred ? "fill-current" : ""}`}
+                />
               </button>
             </>
           ) : job.status === "queued" ? (
@@ -885,24 +866,6 @@ function formatDate(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
-}
-
-function formatShortDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
-function getDateCutoff(filter: string) {
-  if (filter === "all") return null;
-  const now = new Date();
-  if (filter === "today") {
-    return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  }
-  return now.getTime() - Number.parseInt(filter, 10) * 24 * 60 * 60 * 1000;
 }
 
 function formatBytes(bytes: number) {

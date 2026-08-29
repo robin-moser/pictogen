@@ -412,7 +412,7 @@ export function App() {
     return mutateSessionItem(
       assetId,
       () => updateAsset(assetId, { starred }),
-      "The shortlist could not be updated.",
+      "Favorites could not be updated.",
     );
   }
 
