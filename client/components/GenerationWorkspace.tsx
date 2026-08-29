@@ -34,6 +34,8 @@ function useWideLayout() {
 type Props = {
   session: SessionDetail | null;
   draft: SessionDraft;
+  sessionsCollapsed: boolean;
+  onExpandSessions: () => void;
   onDraftChange: (draft: SessionDraft) => void;
   onCreate: () => void;
   onReferenceUploaded: (asset: Asset) => void;
@@ -54,6 +56,8 @@ type Props = {
 export function GenerationWorkspace({
   session,
   draft,
+  sessionsCollapsed,
+  onExpandSessions,
   onDraftChange,
   onCreate,
   onReferenceUploaded,
@@ -73,6 +77,7 @@ export function GenerationWorkspace({
   const [catalogStale, setCatalogStale] = useState(false);
   const [galleryColumns, setGalleryColumns] = useState(3);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsCollapsed, setSettingsCollapsed] = useState(false);
   const [outputExpanded, setOutputExpanded] = useState(false);
   const wideLayout = useWideLayout();
   const referenceLimitErrors = getReferenceLimitErrors(draft, models);
@@ -139,6 +144,17 @@ export function GenerationWorkspace({
         >
           <MenuIcon class="size-4" />
         </label>
+        {sessionsCollapsed && (
+          <button
+            class="btn border-base-content/10 bg-base-100/80 btn-sm btn-square absolute top-8 left-8 hidden shadow-sm backdrop-blur lg:inline-flex"
+            type="button"
+            aria-label="Expand sessions"
+            title="Sessions"
+            onClick={onExpandSessions}
+          >
+            <MenuIcon class="size-4" />
+          </button>
+        )}
         <section class="relative flex max-w-sm flex-col items-center text-center">
           <div class="empty-canvas-mark mb-8" aria-hidden="true">
             <span class="empty-canvas-focus" />
@@ -162,7 +178,7 @@ export function GenerationWorkspace({
 
   return (
     <main class="surface-canvas relative flex min-h-0 grow flex-col">
-      <div class="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between p-4 xl:hidden">
+      <div class="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between p-4">
         <label
           class="btn border-base-content/10 bg-base-100/85 btn-sm btn-square drawer-button pointer-events-auto shadow-sm backdrop-blur lg:hidden"
           for="session-drawer"
@@ -170,8 +186,19 @@ export function GenerationWorkspace({
         >
           <MenuIcon class="size-4" />
         </label>
+        {sessionsCollapsed && (
+          <button
+            class="btn border-base-content/10 bg-base-100/85 btn-sm btn-square pointer-events-auto absolute top-4 left-4 hidden shadow-sm backdrop-blur lg:inline-flex xl:top-8 xl:left-8"
+            type="button"
+            aria-label="Expand sessions"
+            title="Sessions"
+            onClick={onExpandSessions}
+          >
+            <MenuIcon class="size-4" />
+          </button>
+        )}
         <button
-          class="btn border-base-content/10 bg-base-100/85 btn-sm btn-square pointer-events-auto ml-auto shadow-sm backdrop-blur"
+          class="btn border-base-content/10 bg-base-100/85 btn-sm btn-square pointer-events-auto ml-auto shadow-sm backdrop-blur xl:hidden"
           type="button"
           aria-label="Open settings"
           aria-expanded={settingsOpen}
@@ -235,7 +262,19 @@ export function GenerationWorkspace({
           />
         )}
 
-        {!outputExpanded && (
+        {!outputExpanded && wideLayout && settingsCollapsed && (
+          <button
+            class="btn border-base-content/10 bg-base-100/85 btn-sm btn-square absolute top-8 right-8 z-20 shadow-sm backdrop-blur"
+            type="button"
+            aria-label="Expand settings"
+            title="Settings"
+            onClick={() => setSettingsCollapsed(false)}
+          >
+            <SlidersIcon class="size-4" />
+          </button>
+        )}
+
+        {!outputExpanded && (!wideLayout || !settingsCollapsed) && (
           <aside
             class={
               wideLayout
@@ -259,7 +298,9 @@ export function GenerationWorkspace({
               onDraftChange={onDraftChange}
               onModelSearch={setModelSearch}
               onToggleModel={toggleModel}
-              onClose={() => setSettingsOpen(false)}
+              onClose={() =>
+                wideLayout ? setSettingsCollapsed(true) : setSettingsOpen(false)
+              }
             />
           </aside>
         )}

@@ -2,7 +2,13 @@ import { useState } from "preact/hooks";
 
 import type { ImageModel, SessionDraft } from "../../shared/contracts.js";
 import { resolveEffectiveOptions } from "../../shared/capabilities.js";
-import { AlertIcon, CloseIcon, PlusIcon, SearchIcon } from "./Icons.js";
+import {
+  AlertIcon,
+  ChevronRightIcon,
+  CloseIcon,
+  PlusIcon,
+  SearchIcon,
+} from "./Icons.js";
 
 type Props = {
   draft: SessionDraft;
@@ -124,6 +130,15 @@ export function SettingsSidebar({
           onClick={onClose}
         >
           <CloseIcon class="size-4" />
+        </button>
+        <button
+          class="btn btn-ghost btn-sm btn-square hidden xl:inline-flex"
+          type="button"
+          aria-label="Collapse settings"
+          title="Collapse settings"
+          onClick={onClose}
+        >
+          <ChevronRightIcon class="size-4" />
         </button>
       </div>
 

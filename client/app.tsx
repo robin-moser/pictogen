@@ -89,6 +89,7 @@ export function App() {
   const [busySessionId, setBusySessionId] = useState<string | null>(null);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [sessionsCollapsed, setSessionsCollapsed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(preferredTheme);
 
@@ -604,7 +605,7 @@ export function App() {
   }
 
   return (
-    <div class="drawer lg:drawer-open h-dvh">
+    <div class={`drawer h-dvh ${sessionsCollapsed ? "" : "lg:drawer-open"}`}>
       <input
         id="session-drawer"
         class="drawer-toggle"
@@ -633,6 +634,8 @@ export function App() {
         <GenerationWorkspace
           session={activeSession}
           draft={draft}
+          sessionsCollapsed={sessionsCollapsed}
+          onExpandSessions={() => setSessionsCollapsed(false)}
           onDraftChange={changeDraft}
           onCreate={() => void handleCreate("Untitled session")}
           onReferenceUploaded={handleReferenceUploaded}
@@ -670,6 +673,7 @@ export function App() {
           onOpen={(sessionId) => void handleOpen(sessionId)}
           onRename={handleRename}
           onDelete={(session) => void handleDelete(session)}
+          onCollapse={() => setSessionsCollapsed(true)}
         />
       </div>
     </div>

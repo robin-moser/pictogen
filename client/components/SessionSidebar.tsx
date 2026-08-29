@@ -3,6 +3,7 @@ import { useState } from "preact/hooks";
 import type { SessionSummary } from "../../shared/contracts.js";
 import {
   CheckIcon,
+  ChevronLeftIcon,
   CloseIcon,
   MoonIcon,
   PencilIcon,
@@ -35,6 +36,7 @@ type SessionSidebarProps = {
   onOpen: (sessionId: string) => void;
   onRename: (sessionId: string, title: string) => Promise<boolean>;
   onDelete: (session: SessionSummary) => void;
+  onCollapse: () => void;
 };
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -58,6 +60,7 @@ export function SessionSidebar({
   onOpen,
   onRename,
   onDelete,
+  onCollapse,
 }: SessionSidebarProps) {
   const [creating, setCreating] = useState(false);
   const [createTitle, setCreateTitle] = useState("");
@@ -110,6 +113,15 @@ export function SessionSidebar({
           ) : (
             <PlusIcon class="size-4" />
           )}
+        </button>
+        <button
+          class="btn btn-ghost btn-sm btn-square hidden shrink-0 lg:inline-flex"
+          type="button"
+          aria-label="Collapse sessions"
+          title="Collapse sessions"
+          onClick={onCollapse}
+        >
+          <ChevronLeftIcon class="size-4" />
         </button>
       </div>
 
