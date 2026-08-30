@@ -15,7 +15,8 @@
 
 Explore the hosted demo at [pictogen.vserver.app](https://pictogen.vserver.app/?session=cb619c0a-1615-4a4a-8828-ded08411a544).
 It includes prepared sessions with prompts, model settings, generation history,
-and image galleries. Changes are not saved. Image generation, uploads, and
+and image galleries. You can navigate the complete interface and modify draft
+settings locally, but changes are not saved. Image generation, uploads, and
 other data mutations are disabled.
 
 ## Features
@@ -57,21 +58,21 @@ local administrator password, then start the published image:
 
 ```sh
 OPENROUTER_API_KEY=replace-me
-ADMIN_PASSWORD=choose-at-least-8-characters
 ```
 
 ```sh
 docker compose up -d
 ```
 
-Open `http://localhost:3000`. The named `pictogen-data` volume keeps the
-database and generated images between container updates and restarts.
+Open `http://localhost:3000`. On its first start, Pictogen creates the `admin`
+account and prints a one-time password in the container logs. Sign in with that
+password and choose a new one when prompted. The named `pictogen-data` volume
+keeps the database and generated images between container updates and restarts.
 
 ## Development
 
-The project requires Node.js 24. Install dependencies, create a `.env` file from
-`.env.example`, set `OPENROUTER_API_KEY` and `AUTH_MODE`, then run the API and
-Vite development server together:
+The project requires Node.js 24 or later. Install dependencies, create a `.env`
+file from `.env.example`, then run the API and Vite development server together:
 
 ```sh
 npm install
@@ -171,6 +172,7 @@ npm run lint         # Run ESLint
 npm run typecheck    # Check TypeScript
 npm test             # Run automated tests
 npm run build        # Build the production client and server
+npm run thumbnails:regenerate # Regenerate stored image thumbnails
 npm run user:set-password -- admin # Reset an existing user's password from stdin
 ```
 
