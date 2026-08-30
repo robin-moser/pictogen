@@ -1,8 +1,12 @@
-# Pictogen
-
-Pictogen is a self-hosted, multi-user workspace for AI image generation.
-Create images from text and references, compare models, track actual costs,
-and return to named sessions from any browser.
+<div align="center">
+    <img alt="pictogen" title="pictogen" width="96" src="public/logo.svg">
+    <h1 style="color: red">pictogen</h1>
+    <p>
+        Pictogen is a self-hosted, multi-user workspace for AI image generation.<br>
+        Create images from text and references, compare models, track actual costs,<br>
+        and return to named sessions from any browser.
+    </p>
+</div>
 
 <img width="1600" height="915" alt="screenshot-pictogen"
     src="https://raw.githubusercontent.com/robin-moser/pictogen/refs/heads/main/public/screenshot.webp" />
