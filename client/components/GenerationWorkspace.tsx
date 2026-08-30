@@ -33,6 +33,7 @@ function useWideLayout() {
 
 type Props = {
   session: SessionDetail | null;
+  readOnly: boolean;
   draft: SessionDraft;
   onDraftChange: (draft: SessionDraft) => void;
   onCreate: () => void;
@@ -54,6 +55,7 @@ type Props = {
 
 export function GenerationWorkspace({
   session,
+  readOnly,
   draft,
   onDraftChange,
   onCreate,
@@ -212,6 +214,7 @@ export function GenerationWorkspace({
                 references={
                   <ReferenceGrid
                     session={session}
+                    readOnly={readOnly}
                     draft={draft}
                     onReferenceUploaded={onReferenceUploaded}
                     onReferenceRemoved={onReferenceRemoved}
@@ -219,8 +222,12 @@ export function GenerationWorkspace({
                 }
                 onDraftChange={onDraftChange}
                 onGenerate={onGenerate}
-                generationBlocked={referenceLimitErrors.length > 0}
-                generationBlockMessage={referenceLimitErrors[0]}
+                generationBlocked={readOnly || referenceLimitErrors.length > 0}
+                generationBlockMessage={
+                  readOnly
+                    ? "Generation is disabled in the demo workspace."
+                    : referenceLimitErrors[0]
+                }
               />
             </div>
           )}

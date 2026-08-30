@@ -29,6 +29,12 @@ export function createOpenRouterProvider(
   config: AppConfig,
   fetchImplementation: typeof fetch = fetch,
 ): ImageProvider {
+  if (!config.openRouterApiKey) {
+    throw new Error("OPENROUTER_API_KEY must be set outside demo mode.");
+  }
+
+  const apiKey = config.openRouterApiKey;
+
   return {
     id: "openrouter",
     displayName: "OpenRouter",
@@ -37,7 +43,7 @@ export function createOpenRouterProvider(
         "https://openrouter.ai/api/v1/images/models",
         {
           headers: {
-            authorization: `Bearer ${config.openRouterApiKey}`,
+            authorization: `Bearer ${apiKey}`,
             "http-referer": config.publicUrl.origin,
             "x-title": "Pictogen",
           },

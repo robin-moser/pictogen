@@ -14,7 +14,7 @@ type ErrorResponse = {
   };
 };
 
-export type AuthMode = "local" | "forward-auth";
+export type AuthMode = "local" | "forward-auth" | "demo";
 
 export type AuthConfig = {
   mode: AuthMode;

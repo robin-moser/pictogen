@@ -11,6 +11,13 @@
 <img width="1600" height="915" alt="screenshot-pictogen"
     src="https://raw.githubusercontent.com/robin-moser/pictogen/refs/heads/main/public/screenshot.webp" />
 
+## Demo
+
+Explore the hosted demo at [pictogen.vserver.app](https://pictogen.vserver.app/?session=cb619c0a-1615-4a4a-8828-ded08411a544).
+It includes prepared sessions with prompts, model settings, generation history,
+and image galleries. Changes are not saved. Image generation, uploads, and
+other data mutations are disabled.
+
 ## Features
 
 - **Queueing with fair concurrency:** a global queue and per-user limits keep
@@ -76,8 +83,8 @@ Fastify server at `http://localhost:3000`.
 
 ## Authentication
 
-`AUTH_MODE` is required and accepts exactly one value: `local` or
-`forward-auth`. The modes are deployment-wide and mutually exclusive. Usernames
+`AUTH_MODE` is required and accepts exactly one value: `local`, `forward-auth`,
+or `demo`. The modes are deployment-wide and mutually exclusive. Usernames
 are trimmed and normalized to lowercase, and each username maps to one stable
 user and one set of owned data. Switching modes reuses an existing normalized
 username; changing the username supplied by the proxy creates a new account.
@@ -130,6 +137,17 @@ startup.
 and defaults to `false`; it never grants permission to supply an identity
 header.
 
+### Demo mode
+
+Demo mode exposes one shared, read-only workspace without sign-in or an
+OpenRouter key. Set `AUTH_MODE=demo` and optionally `DEMO_USERNAME` (defaults to
+`demo`). The user owns the sessions and generated images visitors may view.
+
+Prepare the demo content by using the same username in local or forward-auth
+mode, then deploy its data directory with demo mode enabled. Demo mode does not
+register image model or generation routes, does not start a generation worker,
+and rejects every API mutation.
+
 ### URLs and origins
 
 `PUBLIC_URL` is required in production. Its protocol controls local session
@@ -160,4 +178,4 @@ npm run user:set-password -- admin # Reset an existing user's password from stdi
 
 Inspired by [imagen-openrouter](https://github.com/yusufipk/imagen-openrouter/).
 
-*This project was developed with AI assist tools.*
+_This project was developed with AI assist tools._

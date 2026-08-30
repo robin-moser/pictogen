@@ -236,6 +236,40 @@ function findOrCreateForwardAuthUser(
     : null;
 }
 
+function findOrCreateDemoUser(
+  database: AppDatabase,
+  suppliedUsername: string,
+): AuthUser {
+  const username = validUsername(suppliedUsername);
+  if (!username) throw new Error("DEMO_USERNAME is invalid.");
+  const now = new Date().toISOString();
+  database.orm
+    .insert(users)
+    .values({
+      id: randomUUID(),
+      username,
+      displayName: suppliedUsername.trim(),
+      isAdmin: false,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing({ target: users.username })
+    .run();
+  const user = database.orm
+    .select()
+    .from(users)
+    .where(eq(users.username, username))
+    .get();
+  if (!user) throw new Error("Demo user could not be created.");
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    isAdmin: false,
+    mustChangePassword: false,
+  };
+}
+
 function createSession(database: AppDatabase, userId: string) {
   const token = randomBytes(32).toString("base64url");
   const now = new Date();
@@ -418,9 +452,14 @@ export async function registerAuthentication(
   const absentPasswordHash =
     config.authMode === "local" ? await hashPassword(generatePassword()) : "";
 
+  const demoUser =
+    config.authMode === "demo"
+      ? findOrCreateDemoUser(database, config.demoUsername)
+      : null;
+
   if (config.authMode === "forward-auth") {
     database.orm.delete(authSessions).run();
-  } else {
+  } else if (config.authMode === "local") {
     removeExpired(database);
     await seedAdministrator(database, config);
   }
@@ -451,7 +490,7 @@ export async function registerAuthentication(
     if (config.authMode === "local") {
       const token = request.cookies[sessionCookie];
       request.authUser = token ? findSessionUser(database, token) : null;
-    } else {
+    } else if (config.authMode === "forward-auth") {
       const address = request.socket.remoteAddress;
       request.authUser =
         address && trustForwardAuthPeer(address, 0)
@@ -460,6 +499,8 @@ export async function registerAuthentication(
               headerValue(request, config.forwardAuth.userHeader) ?? "",
             )
           : null;
+    } else {
+      request.authUser = demoUser;
     }
 
     if (!request.authUser) {
@@ -479,6 +520,18 @@ export async function registerAuthentication(
         error: {
           code: "PASSWORD_CHANGE_REQUIRED",
           message: "Choose a new password to continue.",
+        },
+      });
+      return;
+    }
+    if (
+      config.authMode === "demo" &&
+      ["POST", "PUT", "PATCH", "DELETE"].includes(request.method)
+    ) {
+      void reply.code(403).send({
+        error: {
+          code: "DEMO_READ_ONLY",
+          message: "The demo workspace is read-only.",
         },
       });
       return;

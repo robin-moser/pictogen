@@ -94,4 +94,51 @@ describe("application shell", () => {
 
     await app.close();
   });
+
+  it("serves the shared demo workspace without a provider or mutations", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "pictogen-"));
+    temporaryDirectories.push(dataDir);
+    const config = parseConfig({
+      NODE_ENV: "test",
+      AUTH_MODE: "demo",
+      DATA_DIR: dataDir,
+    });
+    const database = openDatabase({ databasePath: config.databasePath });
+    const app = await buildApp({
+      config,
+      database,
+      provider: {
+        id: "test",
+        displayName: "Test",
+        listImageModels: () => {
+          throw new Error("The demo must not use an image provider.");
+        },
+      },
+    });
+
+    expect(
+      (await app.inject({ method: "GET", url: "/api/auth/config" })).json(),
+    ).toMatchObject({ mode: "demo" });
+    expect(
+      (await app.inject({ method: "GET", url: "/api/me" })).json(),
+    ).toMatchObject({ user: "demo", isAdmin: false });
+
+    const mutation = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      payload: { title: "Nope" },
+    });
+    expect(mutation.statusCode).toBe(403);
+    expect(mutation.json()).toEqual({
+      error: {
+        code: "DEMO_READ_ONLY",
+        message: "The demo workspace is read-only.",
+      },
+    });
+    expect(
+      (await app.inject({ method: "GET", url: "/api/models" })).json(),
+    ).toMatchObject({ models: [], stale: false });
+
+    await app.close();
+  });
 });

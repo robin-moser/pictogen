@@ -1,4 +1,6 @@
-import type { ModelCatalog } from "../../shared/contracts.js";
+import type { ImageModel, ModelCatalog } from "../../shared/contracts.js";
+import type { AppDatabase } from "../db.js";
+import { generationJobs } from "../db/schema.js";
 import type { ImageProvider } from "../providers/types.js";
 
 export function createModelCatalog(
@@ -54,6 +56,39 @@ export function createModelCatalog(
       cached = result;
     }
     return result;
+  }
+
+  return { load };
+}
+
+export function createDemoModelCatalog(database: AppDatabase) {
+  async function load(): Promise<ModelCatalog> {
+    const models = new Map<string, ImageModel>();
+
+    for (const job of database.orm
+      .select({
+        providerId: generationJobs.providerId,
+        modelId: generationJobs.modelId,
+        modelName: generationJobs.modelName,
+      })
+      .from(generationJobs)
+      .all()) {
+      const key = `${job.providerId}:${job.modelId}`;
+      if (!models.has(key)) {
+        models.set(key, {
+          providerId: job.providerId,
+          modelId: job.modelId,
+          name: job.modelName,
+          inputModalities: ["text", "image"],
+        });
+      }
+    }
+
+    return {
+      models: [...models.values()],
+      fetchedAt: new Date().toISOString(),
+      stale: false,
+    };
   }
 
   return { load };

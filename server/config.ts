@@ -14,7 +14,7 @@ const DEFAULTS = {
   modelCacheTtlSeconds: 3600,
 } as const;
 
-export type AuthMode = "local" | "forward-auth";
+export type AuthMode = "local" | "forward-auth" | "demo";
 
 export type AppConfig = Readonly<{
   nodeEnv: "development" | "test" | "production";
@@ -23,7 +23,7 @@ export type AppConfig = Readonly<{
   publicUrl: URL;
   dataDir: string;
   databasePath: string;
-  openRouterApiKey: string;
+  openRouterApiKey?: string;
   globalConcurrency: number;
   perUserConcurrency: number;
   maxUploadBytes: number;
@@ -31,6 +31,7 @@ export type AppConfig = Readonly<{
   authMode: AuthMode;
   adminUsername: string;
   adminPassword?: string;
+  demoUsername: string;
   trustedOrigins: readonly string[];
   trustProxy: boolean | readonly string[];
   forwardAuth: Readonly<{
@@ -41,10 +42,20 @@ export type AppConfig = Readonly<{
 
 function authMode(value: string | undefined): AuthMode {
   const mode = value?.trim();
-  if (mode !== "local" && mode !== "forward-auth") {
-    throw new Error("AUTH_MODE must be local or forward-auth.");
+  if (mode !== "local" && mode !== "forward-auth" && mode !== "demo") {
+    throw new Error("AUTH_MODE must be local, forward-auth, or demo.");
   }
   return mode;
+}
+
+function demoUsername(value: string | undefined) {
+  const username = value?.trim() || "demo";
+  if (username.length > 80 || !/\S/.test(username)) {
+    throw new Error(
+      "DEMO_USERNAME must be between 1 and 80 non-whitespace characters.",
+    );
+  }
+  return username;
 }
 
 function headerName(value: string | undefined, fallback: string, name: string) {
@@ -192,10 +203,14 @@ export function parseConfig(
     publicUrl: publicUrl(environment.PUBLIC_URL, nodeEnv),
     dataDir,
     databasePath: resolveDatabasePath(environment),
-    openRouterApiKey: requiredValue(
-      environment.OPENROUTER_API_KEY,
-      "OPENROUTER_API_KEY",
-    ),
+    ...(selectedAuthMode === "demo"
+      ? {}
+      : {
+          openRouterApiKey: requiredValue(
+            environment.OPENROUTER_API_KEY,
+            "OPENROUTER_API_KEY",
+          ),
+        }),
     globalConcurrency: positiveInteger(
       environment.GLOBAL_CONCURRENCY,
       DEFAULTS.globalConcurrency,
@@ -219,6 +234,7 @@ export function parseConfig(
     authMode: selectedAuthMode,
     adminUsername: environment.ADMIN_USERNAME?.trim() || "admin",
     ...(adminPassword !== undefined ? { adminPassword } : {}),
+    demoUsername: demoUsername(environment.DEMO_USERNAME),
     trustedOrigins: trustedOrigins(environment.TRUSTED_ORIGINS),
     trustProxy: trustProxy(environment.TRUST_PROXY),
     forwardAuth: {

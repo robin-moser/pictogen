@@ -101,6 +101,7 @@ export function App({
   onPasswordChanged,
   onIdentityChanged,
 }: AppProps) {
+  const readOnly = authMode === "demo";
   const [connection, setConnection] = useState<ConnectionState>("checking");
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [activeSession, setActiveSession] = useState<SessionDetail | null>(
@@ -161,6 +162,8 @@ export function App({
   }
 
   async function saveCurrentDraft(): Promise<boolean> {
+    if (readOnly) return true;
+
     if (savePromiseRef.current) {
       await savePromiseRef.current;
     }
@@ -337,6 +340,8 @@ export function App({
   }, [activeSession?.id, activeSession?.activeJobCount]);
 
   async function handleGenerate() {
+    if (readOnly) return;
+
     const session = activeSessionRef.current;
     if (!session || !(await flushDraft())) return;
     try {
@@ -382,7 +387,7 @@ export function App({
     failureMessage: string,
   ) {
     const sessionId = activeSessionRef.current?.id;
-    if (!sessionId || busyItemRef.current) return;
+    if (readOnly || !sessionId || busyItemRef.current) return;
 
     busyItemRef.current = itemId;
     setBusyItemId(itemId);
@@ -457,6 +462,8 @@ export function App({
   }
 
   async function handleCreate(title: string) {
+    if (readOnly) return false;
+
     if (!(await flushDraft())) {
       return false;
     }
@@ -517,6 +524,8 @@ export function App({
   }
 
   async function handleRename(sessionId: string, title: string) {
+    if (readOnly) return false;
+
     try {
       setError(null);
       const updated = await updateSession(sessionId, { title });
@@ -540,6 +549,8 @@ export function App({
   }
 
   async function handleDelete(session: SessionSummary) {
+    if (readOnly) return;
+
     if (!window.confirm(`Delete “${session.title}”? This cannot be undone.`)) {
       return;
     }
@@ -677,6 +688,7 @@ export function App({
 
         <GenerationWorkspace
           session={activeSession}
+          readOnly={readOnly}
           draft={draft}
           onDraftChange={changeDraft}
           onCreate={() => void handleCreate("Untitled session")}

@@ -20,7 +20,10 @@ import { registerModelRoutes } from "./routes/models.js";
 import { createOpenRouterProvider } from "./providers/openrouter.js";
 import type { ImageProvider } from "./providers/types.js";
 import { createAssetService } from "./services/assets.js";
-import { createModelCatalog } from "./services/models.js";
+import {
+  createDemoModelCatalog,
+  createModelCatalog,
+} from "./services/models.js";
 import { createGenerationWorker } from "./services/generation.js";
 import { registerGenerationRoutes } from "./routes/generation.js";
 
@@ -161,21 +164,29 @@ export async function buildApp({
 
   await registerAuthentication(app, config, database, assetService);
 
-  const imageProvider = provider ?? createOpenRouterProvider(config);
-  const modelCatalog = createModelCatalog(
-    imageProvider,
-    config.modelCacheTtlSeconds,
-  );
-  const generationWorker = createGenerationWorker(
-    config,
-    database,
-    imageProvider,
-    assetService,
-  );
+  const imageProvider =
+    config.authMode === "demo"
+      ? null
+      : (provider ?? createOpenRouterProvider(config));
+  const generationWorker = imageProvider
+    ? createGenerationWorker(config, database, imageProvider, assetService)
+    : { wake() {}, start() {}, stop() {} };
   await registerSessionRoutes(app, database, assetService);
   registerAssetRoutes(app, database, assetService);
-  registerModelRoutes(app, modelCatalog);
-  registerGenerationRoutes(app, database, imageProvider, generationWorker.wake);
+  registerModelRoutes(
+    app,
+    imageProvider
+      ? createModelCatalog(imageProvider, config.modelCacheTtlSeconds)
+      : createDemoModelCatalog(database),
+  );
+  if (imageProvider) {
+    registerGenerationRoutes(
+      app,
+      database,
+      imageProvider,
+      generationWorker.wake,
+    );
+  }
 
   if (config.nodeEnv === "production") {
     await app.register(fastifyStatic, {

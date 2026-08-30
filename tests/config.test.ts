@@ -26,7 +26,7 @@ describe("parseConfig", () => {
 
   it("rejects missing required configuration", () => {
     expect(() => parseConfig({ OPENROUTER_API_KEY: "test-key" })).toThrow(
-      "AUTH_MODE must be local or forward-auth.",
+      "AUTH_MODE must be local, forward-auth, or demo.",
     );
     expect(() => parseConfig({ AUTH_MODE: "local" })).toThrow(
       "OPENROUTER_API_KEY must be set.",
@@ -54,7 +54,7 @@ describe("parseConfig", () => {
     for (const mode of ["", "unsupported", "local,forward-auth", "local,"]) {
       expect(() =>
         parseConfig({ OPENROUTER_API_KEY: "test-key", AUTH_MODE: mode }),
-      ).toThrow("AUTH_MODE must be local or forward-auth.");
+      ).toThrow("AUTH_MODE must be local, forward-auth, or demo.");
     }
 
     expect(() =>
@@ -70,6 +70,11 @@ describe("parseConfig", () => {
         FORWARD_AUTH_TRUSTED_PROXIES: "127.0.0.1/32",
       }).authMode,
     ).toBe("forward-auth");
+
+    const demoConfig = parseConfig({ AUTH_MODE: "demo" });
+    expect(demoConfig.authMode).toBe("demo");
+    expect(demoConfig.openRouterApiKey).toBeUndefined();
+    expect(demoConfig.demoUsername).toBe("demo");
   });
 
   it("keeps proxy trust separate and compares complete origins", () => {

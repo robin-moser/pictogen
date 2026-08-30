@@ -9,6 +9,7 @@ import { CloseIcon, ImageIcon, PlusIcon } from "./Icons.js";
 
 type Props = {
   session: SessionDetail;
+  readOnly: boolean;
   draft: SessionDraft;
   onReferenceUploaded: (asset: Asset) => void;
   onReferenceRemoved: (assetId: string) => Promise<boolean>;
@@ -16,6 +17,7 @@ type Props = {
 
 export function ReferenceGrid({
   session,
+  readOnly,
   draft,
   onReferenceUploaded,
   onReferenceRemoved,
@@ -44,7 +46,7 @@ export function ReferenceGrid({
   }, [preview]);
 
   async function addFiles(files: FileList | File[]) {
-    if (uploading || !files[0]) return;
+    if (readOnly || uploading || !files[0]) return;
     if (full) {
       setUploadError("A draft can include at most 20 reference images.");
       return;
