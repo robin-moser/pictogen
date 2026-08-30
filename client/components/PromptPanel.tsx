@@ -220,7 +220,7 @@ export function PromptPanel({
           {modifierGroups.flatMap((group) =>
             (draft.promptModifiers[group.key] ?? []).map((modifier) => (
               <button
-                class={`badge badge-sm badge-outline ${group.badge}`}
+                class={`badge badge-sm badge-outline cursor-pointer ${group.badge}`}
                 type="button"
                 title={`Remove ${modifier.slice(2)}`}
                 onClick={() => removeModifier(group.key, modifier)}
@@ -261,7 +261,7 @@ export function PromptPanel({
         })}
 
         <span
-          class={`ml-1 text-xs tabular-nums ${composedPrompt.length > 12_000 ? "text-error" : "text-base-content/35"}`}
+          class={`ml-1 text-xs tabular-nums max-sm:hidden ${composedPrompt.length > 12_000 ? "text-error" : "text-base-content/35"}`}
         >
           {composedPrompt.length.toLocaleString()}
         </span>
@@ -277,7 +277,7 @@ export function PromptPanel({
         </span>
 
         <button
-          class="btn btn-primary h-11 min-w-28 max-md:ml-auto"
+          class="btn btn-primary h-11 max-md:ml-auto sm:min-w-28"
           type="button"
           disabled={!ready}
           onClick={onGenerate}

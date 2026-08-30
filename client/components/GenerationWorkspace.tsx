@@ -78,7 +78,7 @@ export function GenerationWorkspace({
   const [galleryColumns, setGalleryColumns] = useState(() =>
     typeof window !== "undefined" &&
     window.matchMedia("(max-width: 47.999rem)").matches
-      ? 1
+      ? 2
       : 3,
   );
   const [settingsOpen, setSettingsOpen] = useState(false);

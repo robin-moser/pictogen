@@ -116,7 +116,7 @@ export function ReferenceGrid({
           </span>
         </span>
 
-        <ul class="flex min-w-0 grow items-center gap-1.5 overflow-x-auto">
+        <ul class="-m-1 flex min-w-0 grow items-center gap-1.5 overflow-x-auto p-1">
           {references.map((reference, index) => (
             <li key={reference.id} class="group/ref relative shrink-0">
               <button
@@ -132,7 +132,7 @@ export function ReferenceGrid({
                 />
               </button>
               <button
-                class="bg-base-100 border-base-300 text-base-content/70 hover:bg-error hover:text-error-content absolute -top-1 -right-1 grid size-4 place-items-center rounded-full border opacity-0 transition group-focus-within/ref:opacity-100 group-hover/ref:opacity-100 max-md:opacity-100"
+                class="bg-base-100 border-base-300 text-base-content/70 hover:bg-error hover:text-error-content absolute -top-1 -right-1 grid size-4 cursor-pointer place-items-center rounded-full border opacity-0 transition group-focus-within/ref:opacity-100 group-hover/ref:opacity-100 max-md:opacity-100"
                 type="button"
                 aria-label={`Remove reference image ${index + 1}`}
                 onClick={() => void onReferenceRemoved(reference.id)}

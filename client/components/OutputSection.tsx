@@ -94,6 +94,11 @@ export function OutputSection({
     ).values(),
   );
   const modelKey = models.map((model) => model.key).join(":");
+  const selectedModelName =
+    modelFilter === "all"
+      ? "All models"
+      : (models.find((model) => model.key === modelFilter)?.name ??
+        "All models");
   const filteredJobs = jobs.filter(({ job }) => {
     if (
       modelFilter !== "all" &&
@@ -236,32 +241,35 @@ export function OutputSection({
 
   return (
     <section class="pt-6" aria-labelledby="gallery-heading">
-      <div class="mb-4 flex items-center gap-2 overflow-x-auto pb-1">
+      <div class="-m-1 mb-3 flex items-center gap-2 overflow-x-auto p-1">
         <button
-          class={`btn btn-sm btn-soft xborder-base-300 font-medium shrink-0 ${starredOnly ? "btn-outline" : ""}`}
+          class={`btn btn-sm btn-soft border-base-300 shrink-0 font-medium ${starredOnly ? "btn-outline" : ""}`}
           type="button"
           aria-pressed={starredOnly}
           onClick={() => setStarredOnly((current) => !current)}
         >
           <StarIcon class={`size-3.5 ${starredOnly ? "fill-current" : ""}`} />
-          Favorites
+          <span class="max-sm:hidden">Favorites</span>
         </button>
-        <select
-          class="select select-sm w-36 shrink-0"
-          aria-label="Filter gallery by model"
-          value={modelFilter}
-          onChange={(event) => setModelFilter(event.currentTarget.value)}
-        >
-          <option value="all">All models</option>
-          {models.map((model) => (
-            <option key={model.key} value={model.key}>
-              {model.name}
-            </option>
-          ))}
-        </select>
+        <label class="select select-sm relative flex w-36 shrink-0 cursor-pointer items-center pr-8">
+          <span class="block min-w-0 truncate">{selectedModelName}</span>
+          <select
+            class="absolute inset-0 size-full cursor-pointer opacity-0"
+            aria-label="Filter gallery by model"
+            value={modelFilter}
+            onChange={(event) => setModelFilter(event.currentTarget.value)}
+          >
+            <option value="all">All models</option>
+            {models.map((model) => (
+              <option key={model.key} value={model.key}>
+                {model.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <h2
           id="gallery-heading"
-          class="field-legend flex shrink-0 ml-auto items-center gap-1.5"
+          class="field-legend ml-auto flex shrink-0 items-center gap-1.5 max-sm:hidden"
         >
           <span class="text-base-content/30 tabular-nums">
             {lightboxItems.length} Images
@@ -288,7 +296,7 @@ export function OutputSection({
           <span class="w-2 text-[0.7rem] tabular-nums">{columns}</span>
         </label>
         <button
-          class="btn btn-ghost btn-xs btn-square"
+          class="btn btn-ghost btn-xs btn-square max-sm:hidden"
           type="button"
           aria-label={
             outputExpanded ? "Show prompt and settings" : "Expand output"
