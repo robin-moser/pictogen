@@ -40,7 +40,7 @@ export function AuthScreen({
         <header class="border-base-300 flex items-center gap-3 border-b px-6 py-5">
           <img src="/logo.svg" alt="" width="36" height="36" />
           <div>
-            <h1 class="font-semibold tracking-[-0.025em]">Pictogen</h1>
+            <h1 class="brand-wordmark text-lg leading-none">Pictogen</h1>
             <p class="text-base-content/45 text-xs">Authentication required</p>
           </div>
         </header>

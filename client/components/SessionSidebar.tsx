@@ -173,9 +173,7 @@ export function SessionSidebar({
               width="38"
               height="38"
             />
-            <span class="text-lg font-semibold tracking-[-0.025em]">
-              Pictogen
-            </span>
+            <h1 class="brand-wordmark text-xl leading-none">Pictogen</h1>
           </a>
           <button
             class="btn btn-ghost btn-sm btn-square ml-auto shrink-0"
