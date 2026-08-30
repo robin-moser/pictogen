@@ -275,3 +275,12 @@ export function KeyIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function InfoIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 9h.01M12 12v4" />
+    </Icon>
+  );
+}

@@ -1,5 +1,8 @@
 FROM node:24-alpine AS build
 
+ARG APP_VERSION
+ENV VITE_APP_VERSION=${APP_VERSION}
+
 WORKDIR /app
 
 RUN apk add --no-cache python3 make g++

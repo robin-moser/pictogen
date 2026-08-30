@@ -6,6 +6,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CloseIcon,
+  InfoIcon,
   KeyIcon,
   LogoutIcon,
   MoonIcon,
@@ -27,6 +28,10 @@ const connectionStates: Record<
   connected: { label: "Connected", dot: "status-success" },
   unavailable: { label: "Unavailable", dot: "status-error" },
 };
+
+const appVersion = import.meta.env.VITE_APP_VERSION
+  ? `v${import.meta.env.VITE_APP_VERSION}`
+  : "dev";
 
 type SessionSidebarProps = {
   collapsed: boolean;
@@ -371,7 +376,7 @@ export function SessionSidebar({
           )}
         </nav>
 
-        <div class="border-base-300 flex items-center gap-2.5 border-t px-5 py-4">
+        <div class="border-base-300 relative flex items-center gap-2.5 border-t px-5 py-4">
           <span
             class={`status status-md shrink-0 ${connectionStates[connection].dot}`}
             title={connectionStates[connection].label}
@@ -380,9 +385,45 @@ export function SessionSidebar({
           <span class="text-base-content/45 min-w-0 truncate text-xs">
             {user}
           </span>
+          <details class="dropdown dropdown-top static ml-auto shrink-0">
+            <summary
+              class="btn btn-ghost btn-sm btn-square list-none"
+              aria-label="About Pictogen"
+              title="About Pictogen"
+            >
+              <InfoIcon class="size-4" />
+            </summary>
+            <div
+              class="dropdown-content text-center bg-base-100 border-base-300 absolute right-5
+              bottom-full left-auto z-20 mb-2 w-44 rounded-box border p-3 shadow-lg"
+            >
+              <p class="text-base-content text-xs font-medium">
+                Pictogen {appVersion}
+              </p>
+              <div class="text-base-content/50 mt-2 flex items-center justify-center gap-2 text-xs">
+                <a
+                  class="link link-hover"
+                  href="https://github.com/robin-moser/pictogen"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  GitHub
+                </a>
+                <span aria-hidden="true">·</span>
+                <a
+                  class="link link-hover"
+                  href="https://github.com/robin-moser/pictogen/blob/main/LICENSE"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  MIT License
+                </a>
+              </div>
+            </div>
+          </details>
           {canChangePassword && (
             <button
-              class="btn btn-ghost btn-sm btn-square ml-auto shrink-0"
+              class="btn btn-ghost btn-sm btn-square shrink-0"
               type="button"
               aria-label="Change password"
               title="Change password"
@@ -393,7 +434,7 @@ export function SessionSidebar({
           )}
           {canManageUsers && (
             <button
-              class={`btn btn-ghost btn-sm btn-square shrink-0 ${canChangePassword ? "" : "ml-auto"}`}
+              class="btn btn-ghost btn-sm btn-square shrink-0"
               type="button"
               aria-label="Manage users"
               title="Manage users"
@@ -403,7 +444,7 @@ export function SessionSidebar({
             </button>
           )}
           <button
-            class={`btn btn-ghost btn-sm btn-square shrink-0 ${canManageUsers || canChangePassword ? "" : "ml-auto"}`}
+            class="btn btn-ghost btn-sm btn-square shrink-0"
             type="button"
             aria-label={
               theme === "pictogen-dark"
