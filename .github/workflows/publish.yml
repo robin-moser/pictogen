@@ -1,0 +1,74 @@
+name: Publish
+env:
+  VERSION: 1
+  IMAGENAME: pictogen
+  STACKNAME: pictogen
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  release:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to private Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ secrets.REGISTRY_URL }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_TOKEN }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ secrets.REGISTRY_URL }}/${{ env.IMAGENAME }}
+            ghcr.io/${{ github.repository_owner }}/${{ env.IMAGENAME }}
+          tags: |
+            type=raw,value=${{ env.VERSION }}.${{ github.run_number }}
+            type=raw,value=${{ env.VERSION }}
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=admin
+          cache-to: type=gha,mode=max,scope=admin
+
+      - name: Deploy stack
+        uses: robin-moser/portainer-stack-deploy@v2
+        with:
+          portainer-host: ${{ secrets.PORTAINER_HOST }}
+          token: ${{ secrets.PORTAINER_TOKEN }}
+          swarm-id: ${{ secrets.PORTAINER_SWARM_ID }}
+          stack-name: ${{ env.STACKNAME }}
+          tag-replacements: |
+            ${{ secrets.REGISTRY_URL }}/${{ env.IMAGENAME }}:${{ env.VERSION }}.${{ github.run_number }}
