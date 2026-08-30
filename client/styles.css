@@ -193,7 +193,7 @@
   }
 
   .empty-canvas-mark::before {
-    top: 50%;
+    top: calc(50% - 0.5px);
     left: -1rem;
     width: calc(100% + 2rem);
     height: 1px;
@@ -201,7 +201,7 @@
 
   .empty-canvas-mark::after {
     top: -1rem;
-    left: 50%;
+    left: calc(50% - 0.5px);
     width: 1px;
     height: calc(100% + 2rem);
   }
