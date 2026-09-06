@@ -7,7 +7,7 @@ import {
   ErrorResponseSchema,
   GenerationRunSchema,
 } from "../../shared/contracts.js";
-import type { CreateRun } from "../../shared/contracts.js";
+import type { CreateRun, ModelCatalog } from "../../shared/contracts.js";
 import {
   getReferenceLimitErrors,
   resolveEffectiveOptions,
@@ -22,14 +22,15 @@ import {
   jobReferences,
   sessions,
 } from "../db/schema.js";
-import type { ImageProvider } from "../providers/types.js";
+
+type ModelCatalogLoader = { load(): Promise<ModelCatalog> };
 
 const SessionParams = Type.Object({ sessionId: Type.String({ minLength: 1 }) });
 const JobParams = Type.Object({ jobId: Type.String({ minLength: 1 }) });
 export function registerGenerationRoutes(
   app: FastifyInstance,
   database: AppDatabase,
-  provider: ImageProvider,
+  modelCatalog: ModelCatalogLoader,
   wake: () => void,
 ) {
   app.post<{ Params: { sessionId: string }; Body: CreateRun }>(
@@ -83,7 +84,7 @@ export function registerGenerationRoutes(
         return reply.code(404).send({
           error: { code: "SESSION_NOT_FOUND", message: "Session not found." },
         });
-      const available = await provider.listImageModels();
+      const { models: available } = await modelCatalog.load();
       const selectedModels = request.body.models.map((selection) =>
         available.find(
           (model) =>

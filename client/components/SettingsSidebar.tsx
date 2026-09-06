@@ -1,4 +1,5 @@
-import { useState } from "preact/hooks";
+import { createPortal } from "preact/compat";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 
 import type { ImageModel, SessionDraft } from "../../shared/contracts.js";
 import { resolveEffectiveOptions } from "../../shared/capabilities.js";
@@ -23,6 +24,9 @@ type Props = {
   onClose: () => void;
 };
 
+type ModelSort = "name" | "release-date" | "pricing" | `design-arena:${string}`;
+type HintTarget = { anchor: HTMLElement; model: ImageModel };
+
 const resolutions = ["512", "1K", "2K", "4K"] as const;
 const squareAspectRatio = "1:1" as const;
 const landscapeAspectRatios = ["16:9", "3:2", "4:3"] as const;
@@ -30,6 +34,143 @@ const portraitAspectRatios = ["9:16", "2:3", "3:4"] as const;
 
 const optionButton = "btn border-base-300 bg-base-100 font-medium";
 const optionButtonActive = "btn btn-primary font-semibold";
+const dateFormatter = new Intl.DateTimeFormat(undefined, {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+});
+const priceFormatter = new Intl.NumberFormat(undefined, {
+  style: "currency",
+  currency: "USD",
+  maximumSignificantDigits: 3,
+});
+
+function formatCategory(category: string) {
+  return category
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function modelPrice(model: ImageModel) {
+  // An effective per-image price is comparable across models; the token rates
+  // some image models report instead are not.
+  const perImage = model.displayPricing?.find(
+    (entry) => entry.unit === "/image",
+  );
+  return perImage?.price;
+}
+
+function modelReleaseTime(model: ImageModel) {
+  if (!model.releasedAt) {
+    return undefined;
+  }
+  const timestamp = Date.parse(model.releasedAt);
+  return Number.isNaN(timestamp) ? undefined : timestamp;
+}
+
+function designArenaRank(model: ImageModel, category: string) {
+  return model.benchmarks?.designArena?.find(
+    (benchmark) => benchmark.category === category,
+  )?.rank;
+}
+
+function compareNumber(
+  left: number | undefined,
+  right: number | undefined,
+  direction: "ascending" | "descending" = "ascending",
+) {
+  if (left === undefined) {
+    return right === undefined ? 0 : 1;
+  }
+  if (right === undefined) {
+    return -1;
+  }
+  return direction === "ascending" ? left - right : right - left;
+}
+
+export function compareImageModels(
+  left: ImageModel,
+  right: ImageModel,
+  modelSort: ModelSort,
+) {
+  const compareName = () => left.name.localeCompare(right.name);
+  const benchmarkCategory = modelSort.startsWith("design-arena:")
+    ? modelSort.slice("design-arena:".length)
+    : undefined;
+  switch (modelSort) {
+    case "release-date":
+      return (
+        compareNumber(
+          modelReleaseTime(left),
+          modelReleaseTime(right),
+          "descending",
+        ) || compareName()
+      );
+    case "pricing":
+      return modelPrice(left) === modelPrice(right)
+        ? compareName()
+        : compareNumber(modelPrice(left), modelPrice(right));
+    case "name":
+      return compareName();
+    default:
+      return (
+        compareNumber(
+          designArenaRank(left, benchmarkCategory ?? ""),
+          designArenaRank(right, benchmarkCategory ?? ""),
+        ) || compareName()
+      );
+  }
+}
+
+export function placeModelHint(
+  anchor: { left: number; right: number; top: number; height: number },
+  popover: { width: number; height: number },
+  viewport: { width: number; height: number },
+) {
+  const margin = 16;
+  const gap = 12;
+  const maximumLeft = Math.max(margin, viewport.width - popover.width - margin);
+  const viewportMaxHeight = Math.max(0, viewport.height - margin * 2);
+  const effectiveHeight = Math.min(popover.height, viewportMaxHeight);
+  const fitsLeft = anchor.left - gap - popover.width >= margin;
+  const fitsRight =
+    anchor.right + gap + popover.width <= viewport.width - margin;
+
+  if (fitsLeft || fitsRight) {
+    const left = fitsLeft
+      ? anchor.left - gap - popover.width
+      : anchor.right + gap;
+    const maximumTop = Math.max(
+      margin,
+      viewport.height - effectiveHeight - margin,
+    );
+    const centeredTop = anchor.top + anchor.height / 2 - effectiveHeight / 2;
+    return {
+      left: Math.min(Math.max(left, margin), maximumLeft),
+      top: Math.min(Math.max(centeredTop, margin), maximumTop),
+      maxHeight: viewportMaxHeight,
+    };
+  }
+
+  const aboveSpace = Math.max(0, anchor.top - gap - margin);
+  const belowTop = anchor.top + anchor.height + gap;
+  const belowSpace = Math.max(0, viewport.height - margin - belowTop);
+  const placeAbove = aboveSpace >= belowSpace;
+  const maxHeight = placeAbove ? aboveSpace : belowSpace;
+  const verticalHeight = Math.min(popover.height, maxHeight);
+  return {
+    left: Math.min(
+      Math.max(
+        anchor.left + (anchor.right - anchor.left) / 2 - popover.width / 2,
+        margin,
+      ),
+      maximumLeft,
+    ),
+    top: placeAbove ? anchor.top - gap - verticalHeight : belowTop,
+    maxHeight,
+  };
+}
 
 export function SettingsSidebar({
   draft,
@@ -43,6 +184,38 @@ export function SettingsSidebar({
   onToggleModel,
   onClose,
 }: Props) {
+  const [modelSort, setModelSort] = useState<ModelSort>("name");
+  const [hint, setHint] = useState<{
+    model: ImageModel;
+    anchor: { left: number; right: number; top: number; height: number };
+  } | null>(null);
+  const [hintPosition, setHintPosition] = useState<{
+    left: number;
+    top: number;
+    maxHeight: number;
+  } | null>(null);
+  const hintElement = useRef<HTMLDivElement>(null);
+  const focusedHint = useRef<HintTarget | null>(null);
+  const hoveredHint = useRef<HintTarget | null>(null);
+  const hideHintTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hintHovered = useRef(false);
+
+  useLayoutEffect(() => {
+    if (!hint || !hintElement.current) return;
+    const bounds = hintElement.current.getBoundingClientRect();
+    setHintPosition(
+      placeModelHint(hint.anchor, bounds, {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      }),
+    );
+  }, [hint]);
+
+  useEffect(() => {
+    return () => {
+      if (hideHintTimeout.current) clearTimeout(hideHintTimeout.current);
+    };
+  }, []);
   const selected = new Set(
     draft.models.map((model) => `${model.providerId}:${model.modelId}`),
   );
@@ -61,37 +234,184 @@ export function SettingsSidebar({
   const availableModels = models.filter(
     (model) => !selected.has(`${model.providerId}:${model.modelId}`),
   );
-  const visibleModels = availableModels.filter((model) =>
-    [model.providerId, model.modelId, model.name, model.description]
-      .filter((value): value is string => Boolean(value))
-      .some((value) =>
-        value
-          .toLocaleLowerCase()
-          .includes(modelSearch.trim().toLocaleLowerCase()),
+  const designArenaCategories = [
+    ...new Set(
+      models.flatMap(
+        (model) =>
+          model.benchmarks?.designArena?.map(
+            (benchmark) => benchmark.category,
+          ) ?? [],
       ),
-  );
+    ),
+  ].sort((left, right) => left.localeCompare(right));
+  const sortOptions: Array<{ value: ModelSort; label: string }> = [
+    { value: "name", label: "Name" },
+    { value: "release-date", label: "Release date" },
+    { value: "pricing", label: "Pricing" },
+    ...designArenaCategories.map((category) => ({
+      value: `design-arena:${category}` as ModelSort,
+      label: `Rank ${formatCategory(category)}`,
+    })),
+  ];
+  const activeModelSort = sortOptions.some(
+    (option) => option.value === modelSort,
+  )
+    ? modelSort
+    : "name";
+  const selectedSort = sortOptions.find(
+    (option) => option.value === activeModelSort,
+  ) ?? {
+    value: "name" as const,
+    label: "Name",
+  };
+  const visibleModels = availableModels
+    .filter((model) =>
+      [model.providerId, model.modelId, model.name, model.description]
+        .filter((value): value is string => Boolean(value))
+        .some((value) =>
+          value
+            .toLocaleLowerCase()
+            .includes(modelSearch.trim().toLocaleLowerCase()),
+        ),
+    )
+    .sort((left, right) => compareImageModels(left, right, activeModelSort));
   const capabilityWarnings = selectedModels.flatMap((model) =>
     resolveEffectiveOptions(model, draft).changes.map(
       (change) => `${model.name}: ${change}.`,
     ),
   );
-  const [hint, setHint] = useState<{
-    text: string;
-    top: number;
-    left: number;
-  } | null>(null);
 
-  function showHint(anchor: HTMLElement, text: string) {
-    const rect = anchor.getBoundingClientRect();
+  function cancelHideHint() {
+    if (!hideHintTimeout.current) return;
+    clearTimeout(hideHintTimeout.current);
+    hideHintTimeout.current = null;
+  }
+
+  function hideHint() {
+    cancelHideHint();
+    hintHovered.current = false;
+    focusedHint.current = null;
+    hoveredHint.current = null;
+    setHint(null);
+    setHintPosition(null);
+  }
+
+  function displayHint({ anchor, model }: HintTarget) {
+    cancelHideHint();
+    const bounds = anchor.getBoundingClientRect();
+    setHintPosition(null);
     setHint({
-      text,
-      left: rect.left - 18,
-      top: Math.min(
-        Math.max(rect.top + rect.height / 2, 80),
-        window.innerHeight - 80,
-      ),
+      model,
+      anchor: {
+        left: bounds.left,
+        right: bounds.right,
+        top: bounds.top,
+        height: bounds.height,
+      },
     });
   }
+
+  function scheduleHintUpdate(clearHovered = false) {
+    cancelHideHint();
+    if (clearHovered) hoveredHint.current = null;
+    hideHintTimeout.current = setTimeout(() => {
+      if (hintHovered.current) return;
+      const focused = focusedHint.current;
+      if (focused?.anchor.contains(document.activeElement)) {
+        displayHint(focused);
+        return;
+      }
+      const hovered = hoveredHint.current;
+      if (hovered) {
+        displayHint(hovered);
+        return;
+      }
+      hideHint();
+    }, 300);
+  }
+
+  function showHoveredHint(anchor: HTMLElement, model: ImageModel) {
+    hoveredHint.current = { anchor, model };
+    displayHint(hoveredHint.current);
+  }
+
+  function showFocusedHint(anchor: HTMLElement, model: ImageModel) {
+    focusedHint.current = { anchor, model };
+    displayHint(focusedHint.current);
+  }
+
+  function clearFocusedHint(anchor: HTMLElement) {
+    if (focusedHint.current?.anchor === anchor) focusedHint.current = null;
+    scheduleHintUpdate();
+  }
+
+  function handleHintKeyDown(event: KeyboardEvent) {
+    const element = hintElement.current;
+    if (!element) return;
+    const page = element.clientHeight * 0.8;
+    const canScrollUp = element.scrollTop > 0;
+    const canScrollDown =
+      element.scrollTop < element.scrollHeight - element.clientHeight;
+    switch (event.key) {
+      case "ArrowDown":
+        if (!canScrollDown) return;
+        element.scrollBy({ top: 40 });
+        break;
+      case "ArrowUp":
+        if (!canScrollUp) return;
+        element.scrollBy({ top: -40 });
+        break;
+      case "PageDown":
+        if (!canScrollDown) return;
+        element.scrollBy({ top: page });
+        break;
+      case "PageUp":
+        if (!canScrollUp) return;
+        element.scrollBy({ top: -page });
+        break;
+      case "Home":
+        if (!canScrollUp) return;
+        element.scrollTo({ top: 0 });
+        break;
+      case "End":
+        if (!canScrollDown) return;
+        element.scrollTo({ top: element.scrollHeight });
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+  }
+
+  useEffect(() => {
+    if (!hint) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      hideHint();
+    };
+    const onViewportChange = (event: Event) => {
+      if (
+        event.target instanceof Node &&
+        hintElement.current?.contains(event.target)
+      ) {
+        return;
+      }
+      hideHint();
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("resize", onViewportChange);
+    window.addEventListener("scroll", onViewportChange, true);
+    window.visualViewport?.addEventListener("resize", onViewportChange);
+    window.visualViewport?.addEventListener("scroll", onViewportChange);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("resize", onViewportChange);
+      window.removeEventListener("scroll", onViewportChange, true);
+      window.visualViewport?.removeEventListener("resize", onViewportChange);
+      window.visualViewport?.removeEventListener("scroll", onViewportChange);
+    };
+  }, [hint]);
 
   function clearOutputOption(
     option: "quality" | "background" | "outputFormat" | "outputCompression",
@@ -144,13 +464,43 @@ export function SettingsSidebar({
 
       <div class="scroll-pane grow px-6 py-7">
         <section aria-labelledby="models-heading">
-          <div class="mb-3 flex items-baseline justify-between gap-3">
+          <div class="mb-3 flex items-center justify-between gap-3">
             <h3 id="models-heading" class="field-legend">
               Models
             </h3>
-            <span class="text-base-content/40 text-xs tabular-nums">
-              {draft.models.length}
-            </span>
+            <div class="flex items-center gap-2">
+              <span class="text-base-content/40 text-xs tabular-nums">
+                {draft.models.length}
+              </span>
+              <details class="dropdown dropdown-end">
+                <summary class="btn btn-ghost btn-xs list-none gap-1 px-2 text-xs font-medium">
+                  Sort: {selectedSort.label}
+                </summary>
+                <ul class="menu bg-base-100 border-base-300 dropdown-content z-50 mt-2 w-60 rounded-field border p-1 shadow-lg">
+                  {sortOptions.map((option) => (
+                    <li key={option.value}>
+                      <button
+                        class={
+                          option.value === activeModelSort
+                            ? "menu-active"
+                            : undefined
+                        }
+                        type="button"
+                        onClick={(event) => {
+                          hideHint();
+                          setModelSort(option.value);
+                          event.currentTarget
+                            .closest("details")
+                            ?.removeAttribute("open");
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </div>
           </div>
 
           {selectedModels.length > 0 && (
@@ -159,9 +509,28 @@ export function SettingsSidebar({
                 <li
                   key={`${model.providerId}:${model.modelId}`}
                   class="bg-base-100 border-base-300 rounded-field flex min-h-11 items-center gap-2.5 border py-2 pr-2 pl-3"
+                  onMouseEnter={(event) =>
+                    showHoveredHint(event.currentTarget, model)
+                  }
+                  onMouseLeave={() => scheduleHintUpdate(true)}
                 >
                   <span class="bg-primary size-1.5 shrink-0 rounded-full" />
-                  <span class="min-w-0 grow">
+                  <span
+                    class="min-w-0 grow outline-none focus-visible:underline"
+                    tabIndex={0}
+                    aria-label={`${model.name} details`}
+                    aria-describedby={
+                      hint?.model.providerId === model.providerId &&
+                      hint.model.modelId === model.modelId
+                        ? "model-details-popover"
+                        : undefined
+                    }
+                    onFocus={(event) =>
+                      showFocusedHint(event.currentTarget, model)
+                    }
+                    onBlur={(event) => clearFocusedHint(event.currentTarget)}
+                    onKeyDown={handleHintKeyDown}
+                  >
                     <span class="block truncate text-sm font-medium">
                       {model.name}
                     </span>
@@ -172,7 +541,10 @@ export function SettingsSidebar({
                   <button
                     class="btn btn-ghost btn-sm btn-square shrink-0"
                     type="button"
-                    onClick={() => onToggleModel(model)}
+                    onClick={() => {
+                      hideHint();
+                      onToggleModel(model);
+                    }}
                     aria-label={`Remove ${model.name}`}
                     title="Remove"
                   >
@@ -206,30 +578,36 @@ export function SettingsSidebar({
           ) : (
             <ul
               class="border-base-300 divide-base-300 rounded-field mt-3 max-h-80 divide-y overflow-y-auto border"
-              onScroll={() => setHint(null)}
-              onMouseLeave={() => setHint(null)}
+              onScroll={hideHint}
+              onMouseLeave={() => scheduleHintUpdate(true)}
             >
               {visibleModels.map((model) => (
                 <li
                   key={`${model.providerId}:${model.modelId}`}
+                  class="hover:bg-base-300/50 flex items-center transition-colors"
                   onMouseEnter={(event) =>
-                    showHint(
-                      event.currentTarget,
-                      `${model.name}\n${model.providerId} / ${model.modelId}\n${model.description ?? ""}`.trim(),
-                    )
+                    showHoveredHint(event.currentTarget, model)
                   }
                 >
                   <button
-                    class="hover:bg-base-300/50 group/model flex w-full items-start gap-2.5 px-3 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-35"
+                    class="group/model flex w-full min-w-0 items-start gap-2.5 px-3 py-3 text-left disabled:cursor-not-allowed disabled:opacity-35"
                     type="button"
-                    onClick={() => onToggleModel(model)}
-                    onFocus={(event) =>
-                      showHint(
-                        event.currentTarget,
-                        `${model.name}\n${model.providerId} / ${model.modelId}\n${model.description ?? ""}`.trim(),
-                      )
+                    onClick={() => {
+                      hideHint();
+                      onToggleModel(model);
+                    }}
+                    aria-label={`Add ${model.name}`}
+                    aria-describedby={
+                      hint?.model.providerId === model.providerId &&
+                      hint.model.modelId === model.modelId
+                        ? "model-details-popover"
+                        : undefined
                     }
-                    onBlur={() => setHint(null)}
+                    onFocus={(event) =>
+                      showFocusedHint(event.currentTarget, model)
+                    }
+                    onBlur={(event) => clearFocusedHint(event.currentTarget)}
+                    onKeyDown={handleHintKeyDown}
                   >
                     <span class="min-w-0 grow">
                       <span class="block truncate text-sm font-medium">
@@ -478,19 +856,103 @@ export function SettingsSidebar({
         )}
       </div>
 
-      {hint && (
-        <div
-          class="bg-base-300 border-base-content/10 rounded-field pointer-events-none fixed z-50 max-w-80 border px-3 py-2 text-xs leading-5 whitespace-pre-line shadow-lg"
-          style={{
-            left: `${hint.left}px`,
-            top: `${hint.top}px`,
-            transform: "translate(-100%, -50%)",
-          }}
-          role="tooltip"
-        >
-          {hint.text}
-        </div>
-      )}
+      {hint &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={hintElement}
+            id="model-details-popover"
+            class="bg-base-100 border-base-content/10 rounded-field fixed z-50 max-h-[calc(100dvh-2rem)] w-96 max-w-[calc(100vw-2rem)] overflow-y-auto border p-4 text-xs leading-5 shadow-xl"
+            style={{
+              left: `${hintPosition?.left ?? 0}px`,
+              top: `${hintPosition?.top ?? 0}px`,
+              maxHeight: hintPosition
+                ? `${hintPosition.maxHeight}px`
+                : undefined,
+              visibility: hintPosition ? "visible" : "hidden",
+            }}
+            role="tooltip"
+            onMouseEnter={() => {
+              hintHovered.current = true;
+              cancelHideHint();
+            }}
+            onMouseLeave={() => {
+              hintHovered.current = false;
+              scheduleHintUpdate(true);
+            }}
+          >
+            <p class="text-sm font-semibold">{hint.model.name}</p>
+            <p class="text-base-content/50 mt-0.5 break-all font-mono text-[11px]">
+              {hint.model.providerId} / {hint.model.modelId}
+            </p>
+            {hint.model.description && (
+              <p class="text-base-content/70 mt-3 whitespace-pre-line">
+                {hint.model.description}
+              </p>
+            )}
+
+            {(hint.model.releasedAt || hint.model.displayPricing) && (
+              <dl class="border-base-300 mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t pt-3">
+                {hint.model.releasedAt && (
+                  <div>
+                    <dt class="text-base-content/45 text-[11px] font-medium tracking-wide uppercase">
+                      Release date
+                    </dt>
+                    <dd class="mt-0.5 tabular-nums">
+                      {dateFormatter.format(new Date(hint.model.releasedAt))}
+                    </dd>
+                  </div>
+                )}
+                {hint.model.displayPricing && (
+                  <div>
+                    <dt class="text-base-content/45 text-[11px] font-medium tracking-wide uppercase">
+                      Pricing
+                    </dt>
+                    <dd class="mt-0.5 space-y-0.5 tabular-nums">
+                      {hint.model.displayPricing.map((entry, index) => (
+                        <span
+                          class="block"
+                          key={`${entry.label}${entry.unit}${index}`}
+                        >
+                          {entry.label} {priceFormatter.format(entry.price)}
+                          {entry.unit}
+                        </span>
+                      ))}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            )}
+
+            {Boolean(hint.model.benchmarks?.designArena?.length) && (
+              <div class="border-base-300 mt-4 border-t pt-3">
+                <p class="text-base-content/45 text-[11px] font-medium tracking-wide uppercase">
+                  Design Arena
+                </p>
+                <dl class="mt-1 grid grid-cols-2 gap-x-4 gap-y-1.5">
+                  {[...(hint.model.benchmarks?.designArena ?? [])]
+                    .sort((left, right) =>
+                      left.category.localeCompare(right.category),
+                    )
+                    .map((benchmark) => (
+                      <div
+                        class="flex justify-between gap-2"
+                        key={benchmark.category}
+                      >
+                        <dt class="text-base-content/70 truncate">
+                          {formatCategory(benchmark.category)}
+                        </dt>
+                        <dd class="font-medium tabular-nums">
+                          #{benchmark.rank}
+                        </dd>
+                      </div>
+                    ))}
+                </dl>
+              </div>
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

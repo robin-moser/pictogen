@@ -171,19 +171,17 @@ export async function buildApp({
   const generationWorker = imageProvider
     ? createGenerationWorker(config, database, imageProvider, assetService)
     : { wake() {}, start() {}, stop() {} };
+  const modelCatalog = imageProvider
+    ? createModelCatalog(imageProvider, config.modelCacheTtlSeconds)
+    : createDemoModelCatalog(database);
   await registerSessionRoutes(app, database, assetService);
   registerAssetRoutes(app, database, assetService);
-  registerModelRoutes(
-    app,
-    imageProvider
-      ? createModelCatalog(imageProvider, config.modelCacheTtlSeconds)
-      : createDemoModelCatalog(database),
-  );
+  registerModelRoutes(app, modelCatalog);
   if (imageProvider) {
     registerGenerationRoutes(
       app,
       database,
-      imageProvider,
+      modelCatalog,
       generationWorker.wake,
     );
   }

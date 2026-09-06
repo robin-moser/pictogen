@@ -319,6 +319,37 @@ export const ImageModelSchema = Type.Object(
     modelId: Type.String(),
     name: Type.String(),
     description: Type.Optional(Type.String()),
+    releasedAt: Type.Optional(Type.String({ format: "date-time" })),
+    displayPricing: Type.Optional(
+      Type.Array(
+        Type.Object(
+          {
+            label: Type.String({ minLength: 1 }),
+            price: Type.Number({ minimum: 0 }),
+            unit: Type.String({ minLength: 1 }),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+    ),
+    benchmarks: Type.Optional(
+      Type.Object(
+        {
+          designArena: Type.Optional(
+            Type.Array(
+              Type.Object(
+                {
+                  category: Type.String({ minLength: 1 }),
+                  rank: Type.Integer({ minimum: 1 }),
+                },
+                { additionalProperties: false },
+              ),
+            ),
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
     inputModalities: Type.Array(
       Type.Union([Type.Literal("text"), Type.Literal("image")]),
     ),
