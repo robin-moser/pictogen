@@ -626,13 +626,6 @@ export function App({
 
   async function handleDeleteGroup(group: SessionGroup) {
     if (readOnly || group.isArchived) return;
-    if (
-      !window.confirm(
-        `Delete group “${group.title}”? Its sessions will move to Sessions.`,
-      )
-    ) {
-      return;
-    }
 
     try {
       setError(null);

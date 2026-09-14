@@ -1,4 +1,5 @@
-import { useEffect, useState } from "preact/hooks";
+import { createPortal } from "preact/compat";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 
 import type { SessionGroup, SessionSummary } from "../../shared/contracts.js";
 import {
@@ -7,6 +8,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CloseIcon,
+  EllipsisHorizontalIcon,
   FolderPlusIcon,
   InfoIcon,
   KeyIcon,
@@ -28,6 +30,10 @@ type DropTarget =
   | { kind: "group"; id: string }
   | { kind: "group-position"; id: string; position: GroupDropPosition }
   | { kind: "ungrouped" };
+
+type ActionMenu =
+  | { kind: "session"; id: string; anchor: HTMLElement }
+  | { kind: "group"; id: string; anchor: HTMLElement };
 
 const sessionDragType = "application/x-pictogen-session";
 const groupDragType = "application/x-pictogen-session-group";
@@ -126,11 +132,34 @@ export function SessionSidebar({
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [editGroupTitle, setEditGroupTitle] = useState("");
   const [openGroupIds, setOpenGroupIds] = useState<Set<string>>(new Set());
+  const knownGroupIds = useRef<Set<string>>(new Set());
   const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
   const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const [actionMenu, setActionMenu] = useState<ActionMenu | null>(null);
+  const [actionMenuPosition, setActionMenuPosition] = useState<{
+    left: number;
+    top: number;
+  } | null>(null);
+  const actionMenuElement = useRef<HTMLUListElement>(null);
+
+  const archivedGroup = groups.find((group) => group.isArchived);
+  const visibleGroups = groups.filter(
+    (group) =>
+      !group.isArchived ||
+      sessions.some((session) => session.groupId === group.id),
+  );
+  const actionSession =
+    actionMenu?.kind === "session"
+      ? sessions.find((session) => session.id === actionMenu.id)
+      : undefined;
+  const actionGroup =
+    actionMenu?.kind === "group"
+      ? groups.find((group) => group.id === actionMenu.id)
+      : undefined;
 
   useEffect(() => {
+    const known = knownGroupIds.current;
     setOpenGroupIds((current) => {
       const next = new Set(
         [...current].filter((groupId) =>
@@ -138,12 +167,119 @@ export function SessionSidebar({
         ),
       );
       for (const group of groups) {
-        if (!group.isArchived && !current.has(group.id)) next.add(group.id);
+        if (!group.isArchived && !known.has(group.id)) next.add(group.id);
         if (group.isArchived) next.delete(group.id);
       }
       return next;
     });
+    knownGroupIds.current = new Set(groups.map((group) => group.id));
   }, [groups]);
+
+  useLayoutEffect(() => {
+    if (!actionMenu || !actionMenuElement.current) return;
+
+    const margin = 8;
+    const gap = 4;
+    const anchor = actionMenu.anchor.getBoundingClientRect();
+    const menu = actionMenuElement.current.getBoundingClientRect();
+    const maximumLeft = Math.max(
+      margin,
+      window.innerWidth - menu.width - margin,
+    );
+    const below = anchor.bottom + gap;
+    setActionMenuPosition({
+      left: Math.min(Math.max(anchor.right - menu.width, margin), maximumLeft),
+      top:
+        below + menu.height <= window.innerHeight - margin
+          ? below
+          : Math.max(margin, anchor.top - gap - menu.height),
+    });
+    actionMenuElement.current
+      .querySelector<HTMLButtonElement>("button")
+      ?.focus();
+  }, [actionMenu]);
+
+  useEffect(() => {
+    if (!actionMenu) return;
+
+    function dismissActionMenu(event: PointerEvent) {
+      const target = event.target;
+      if (
+        target instanceof Node &&
+        (actionMenuElement.current?.contains(target) ||
+          actionMenu?.anchor.contains(target))
+      ) {
+        return;
+      }
+      setActionMenu(null);
+    }
+
+    function closeActionMenu(restoreFocus = false) {
+      const anchor = actionMenu?.anchor;
+      setActionMenu(null);
+      if (restoreFocus) queueMicrotask(() => anchor?.focus());
+    }
+
+    function dismissOnFocusChange(event: FocusEvent) {
+      const target = event.target;
+      if (
+        target instanceof Node &&
+        (actionMenuElement.current?.contains(target) ||
+          actionMenu?.anchor.contains(target))
+      ) {
+        return;
+      }
+      closeActionMenu();
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeActionMenu(true);
+        return;
+      }
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+        return;
+      }
+
+      const items = Array.from(
+        actionMenuElement.current?.querySelectorAll<HTMLButtonElement>(
+          "button:not(:disabled)",
+        ) ?? [],
+      );
+      if (items.length === 0) return;
+      const currentIndex = items.indexOf(
+        document.activeElement as HTMLButtonElement,
+      );
+      const nextIndex =
+        event.key === "Home"
+          ? 0
+          : event.key === "End"
+            ? items.length - 1
+            : event.key === "ArrowUp"
+              ? (currentIndex - 1 + items.length) % items.length
+              : (currentIndex + 1) % items.length;
+      event.preventDefault();
+      items[nextIndex]?.focus();
+    }
+
+    function closeOnViewportChange() {
+      closeActionMenu();
+    }
+
+    document.addEventListener("pointerdown", dismissActionMenu);
+    document.addEventListener("focusin", dismissOnFocusChange);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", closeOnViewportChange);
+    window.addEventListener("scroll", closeOnViewportChange, true);
+    return () => {
+      document.removeEventListener("pointerdown", dismissActionMenu);
+      document.removeEventListener("focusin", dismissOnFocusChange);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", closeOnViewportChange);
+      window.removeEventListener("scroll", closeOnViewportChange, true);
+    };
+  }, [actionMenu]);
 
   async function submitCreate(event: SubmitEvent) {
     event.preventDefault();
@@ -252,6 +388,18 @@ export function SessionSidebar({
     }
   }
 
+  function toggleActionMenu(
+    event: MouseEvent,
+    kind: ActionMenu["kind"],
+    id: string,
+  ) {
+    const anchor = event.currentTarget as HTMLElement;
+    setActionMenuPosition(null);
+    setActionMenu((current) =>
+      current?.kind === kind && current.id === id ? null : { kind, id, anchor },
+    );
+  }
+
   function dropOnGroup(event: DragEvent, group: SessionGroup) {
     event.preventDefault();
     event.stopPropagation();
@@ -311,8 +459,6 @@ export function SessionSidebar({
     const active = session.id === activeSessionId;
     const editing = session.id === editingId;
     const busy = session.id === busySessionId;
-    const archivedGroup = groups.find((group) => group.isArchived);
-    const archived = session.groupId === archivedGroup?.id;
     const sessionTarget =
       dropTarget?.kind === "session" && dropTarget.id === session.id
         ? dropTarget.position
@@ -329,9 +475,9 @@ export function SessionSidebar({
             class="bg-base-100 border-base-300 rounded-field border p-1.5"
             onSubmit={(event) => submitRename(event, session.id)}
           >
-            <div class="join w-full">
+            <div class="join rounded-field focus-within:outline-base-content w-full focus-within:outline-2 focus-within:outline-offset-2">
               <input
-                class="input input-xs join-item min-w-0 grow"
+                class="input input-xs join-item min-w-0 grow focus:outline-none"
                 aria-label={`Rename ${session.title}`}
                 value={editTitle}
                 maxLength={120}
@@ -393,7 +539,7 @@ export function SessionSidebar({
           />
         )}
         <button
-          class={`rounded-field flex w-full min-w-0 flex-col items-stretch gap-1.5 py-3 pr-20 pl-3.5 text-left transition-colors ${
+          class={`rounded-field flex w-full min-w-0 flex-col items-stretch gap-1.5 py-3 pr-12 pl-3.5 text-left transition-colors ${
             active ? "bg-base-300 text-base-content" : "hover:bg-base-300/50"
           } ${sessionTarget === "group" ? "ring-primary ring-2 ring-inset" : ""}`}
           type="button"
@@ -401,6 +547,7 @@ export function SessionSidebar({
           draggable={!busy}
           aria-current={active ? "page" : undefined}
           onDragStart={(event) => {
+            setActionMenu(null);
             setDraggedSessionId(session.id);
             event.dataTransfer?.setData(sessionDragType, session.id);
             event.dataTransfer?.setData("text/plain", session.id);
@@ -452,46 +599,19 @@ export function SessionSidebar({
           </span>
         </button>
 
-        <div class="absolute top-1 right-1.5 flex gap-0.5 opacity-0 transition-opacity group-focus-within/session:opacity-100 group-hover/session:opacity-100 max-md:opacity-100">
-          <button
-            class="btn btn-ghost btn-sm btn-square"
-            type="button"
-            aria-label={`Rename ${session.title}`}
-            title="Rename"
-            onClick={() => {
-              setEditingId(session.id);
-              setEditTitle(session.title);
-            }}
-          >
-            <PencilIcon class="size-4" />
-          </button>
-          {archivedGroup && (
-            <button
-              class="btn btn-ghost btn-sm btn-square"
-              type="button"
-              aria-label={
-                archived
-                  ? `Restore ${session.title}`
-                  : `Archive ${session.title}`
-              }
-              title={archived ? "Restore" : "Archive"}
-              onClick={() =>
-                onMove(session.id, archived ? null : archivedGroup.id)
-              }
-            >
-              <ArchiveIcon class="size-4" />
-            </button>
-          )}
-          <button
-            class="btn btn-ghost btn-sm btn-square hover:text-error"
-            type="button"
-            aria-label={`Delete ${session.title}`}
-            title="Delete"
-            onClick={() => onDelete(session)}
-          >
-            <TrashIcon class="size-4" />
-          </button>
-        </div>
+        <button
+          class="btn btn-ghost btn-sm btn-square absolute top-1 right-1.5 z-10 opacity-60 transition-opacity hover:opacity-100"
+          type="button"
+          aria-label={`Actions for ${session.title}`}
+          aria-expanded={
+            actionMenu?.kind === "session" && actionMenu.id === session.id
+          }
+          aria-haspopup="menu"
+          title="Session actions"
+          onClick={(event) => toggleActionMenu(event, "session", session.id)}
+        >
+          <EllipsisHorizontalIcon class="size-4" />
+        </button>
       </li>
     );
   }
@@ -611,10 +731,10 @@ export function SessionSidebar({
 
         {creating && (
           <form class="shrink-0 px-4 pb-5" onSubmit={submitCreate}>
-            <div class="join w-full">
+            <div class="join rounded-field focus-within:outline-base-content w-full focus-within:outline-2 focus-within:outline-offset-2">
               <input
                 id="new-session-title"
-                class="input input-sm join-item min-w-0 grow"
+                class="input input-sm join-item min-w-0 grow focus:outline-none"
                 value={createTitle}
                 maxLength={120}
                 placeholder="Session name"
@@ -637,10 +757,10 @@ export function SessionSidebar({
 
         {creatingGroup && (
           <form class="shrink-0 px-4 pb-5" onSubmit={submitCreateGroup}>
-            <div class="join w-full">
+            <div class="join rounded-field focus-within:outline-base-content w-full focus-within:outline-2 focus-within:outline-offset-2">
               <input
                 id="new-session-group-title"
-                class="input input-sm join-item min-w-0 grow"
+                class="input input-sm join-item min-w-0 grow focus:outline-none"
                 value={createGroupTitle}
                 maxLength={120}
                 placeholder="Group name"
@@ -697,7 +817,7 @@ export function SessionSidebar({
           ) : (
             <ul class="flex flex-col gap-1.5">
               {ungroupedSessions.map(renderSession)}
-              {groups.map((group) => {
+              {visibleGroups.map((group) => {
                 const groupSessions = sessions.filter(
                   (session) => session.groupId === group.id,
                 );
@@ -755,6 +875,7 @@ export function SessionSidebar({
                         draggable={!group.isArchived && !editing}
                         aria-expanded={open}
                         onDragStart={(event) => {
+                          setActionMenu(null);
                           setDraggedGroupId(group.id);
                           event.dataTransfer?.setData(groupDragType, group.id);
                           event.dataTransfer?.setData("text/plain", group.id);
@@ -782,30 +903,25 @@ export function SessionSidebar({
                           {groupSessions.length}
                         </span>
                       </button>
-                      {!group.isArchived && !editing && (
-                        <div class="flex">
-                          <button
-                            class="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
-                            type="button"
-                            aria-label={`Rename ${group.title}`}
-                            title="Rename group"
-                            onClick={() => {
-                              setEditingGroupId(group.id);
-                              setEditGroupTitle(group.title);
-                            }}
-                          >
-                            <PencilIcon class="size-3.5" />
-                          </button>
-                          <button
-                            class="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-error"
-                            type="button"
-                            aria-label={`Delete ${group.title}`}
-                            title="Delete group"
-                            onClick={() => onDeleteGroup(group)}
-                          >
-                            <TrashIcon class="size-3.5" />
-                          </button>
-                        </div>
+                      {!group.isArchived && !editing ? (
+                        <button
+                          class="btn btn-ghost btn-xs btn-square shrink-0 opacity-60 transition-opacity hover:opacity-100"
+                          type="button"
+                          aria-label={`Actions for ${group.title}`}
+                          aria-expanded={
+                            actionMenu?.kind === "group" &&
+                            actionMenu.id === group.id
+                          }
+                          aria-haspopup="menu"
+                          title="Group actions"
+                          onClick={(event) =>
+                            toggleActionMenu(event, "group", group.id)
+                          }
+                        >
+                          <EllipsisHorizontalIcon class="size-3.5" />
+                        </button>
+                      ) : (
+                        <span class="size-6 shrink-0" aria-hidden="true" />
                       )}
                     </div>
                     {editing && (
@@ -813,9 +929,9 @@ export function SessionSidebar({
                         class="mt-1 px-1"
                         onSubmit={(event) => submitRenameGroup(event, group.id)}
                       >
-                        <div class="join w-full">
+                        <div class="join rounded-field focus-within:outline-base-content w-full focus-within:outline-2 focus-within:outline-offset-2">
                           <input
-                            class="input input-xs join-item min-w-0 grow"
+                            class="input input-xs join-item min-w-0 grow focus:outline-none"
                             aria-label={`Rename ${group.title}`}
                             value={editGroupTitle}
                             maxLength={120}
@@ -952,6 +1068,110 @@ export function SessionSidebar({
           )}
         </div>
       </div>
+
+      {actionMenu &&
+        (actionSession || actionGroup) &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <ul
+            ref={actionMenuElement}
+            class="menu bg-base-100 border-base-300 rounded-box fixed z-[100] w-36 border p-1 shadow-xl"
+            style={{
+              left: `${actionMenuPosition?.left ?? 0}px`,
+              top: `${actionMenuPosition?.top ?? 0}px`,
+              visibility: actionMenuPosition ? "visible" : "hidden",
+            }}
+            role="menu"
+          >
+            {actionSession && (
+              <>
+                <li>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setActionMenu(null);
+                      setEditingId(actionSession.id);
+                      setEditTitle(actionSession.title);
+                    }}
+                  >
+                    <PencilIcon class="size-4" />
+                    Rename
+                  </button>
+                </li>
+                {archivedGroup && (
+                  <li>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setActionMenu(null);
+                        onMove(
+                          actionSession.id,
+                          actionSession.groupId === archivedGroup.id
+                            ? null
+                            : archivedGroup.id,
+                        );
+                      }}
+                    >
+                      <ArchiveIcon class="size-4" />
+                      {actionSession.groupId === archivedGroup.id
+                        ? "Restore"
+                        : "Archive"}
+                    </button>
+                  </li>
+                )}
+                <li>
+                  <button
+                    class="text-error"
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setActionMenu(null);
+                      onDelete(actionSession);
+                    }}
+                  >
+                    <TrashIcon class="size-4" />
+                    Delete
+                  </button>
+                </li>
+              </>
+            )}
+            {actionGroup && !actionGroup.isArchived && (
+              <>
+                <li>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setActionMenu(null);
+                      setEditingGroupId(actionGroup.id);
+                      setEditGroupTitle(actionGroup.title);
+                    }}
+                  >
+                    <PencilIcon class="size-4" />
+                    Rename
+                  </button>
+                </li>
+                <li>
+                  <button
+                    class="text-error"
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setActionMenu(null);
+                      onDeleteGroup(actionGroup);
+                    }}
+                  >
+                    <TrashIcon class="size-4" />
+                    Delete
+                  </button>
+                </li>
+              </>
+            )}
+          </ul>,
+          document.body,
+        )}
     </aside>
   );
 }
