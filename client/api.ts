@@ -5,6 +5,7 @@ import type {
   ModelCatalog,
   SessionDetail,
   SessionDraft,
+  SessionGroup,
   SessionSummary,
 } from "../shared/contracts.js";
 
@@ -151,6 +152,12 @@ export function listSessions(signal?: AbortSignal) {
   return request<SessionSummary[]>("/api/sessions", { signal: signal ?? null });
 }
 
+export function listSessionGroups(signal?: AbortSignal) {
+  return request<SessionGroup[]>("/api/session-groups", {
+    signal: signal ?? null,
+  });
+}
+
 export function getSession(sessionId: string, signal?: AbortSignal) {
   return request<SessionDetail>(
     `/api/sessions/${encodeURIComponent(sessionId)}`,
@@ -165,6 +172,37 @@ export function createSession(title: string) {
   );
 }
 
+export function createSessionGroup(title: string) {
+  return request<SessionGroup>(
+    "/api/session-groups",
+    jsonRequest("POST", { title }),
+  );
+}
+
+export function updateSessionGroup(groupId: string, title: string) {
+  return request<SessionGroup>(
+    `/api/session-groups/${encodeURIComponent(groupId)}`,
+    jsonRequest("PATCH", { title }),
+  );
+}
+
+export function moveSessionGroup(
+  groupId: string,
+  beforeGroupId: string | null,
+) {
+  return request<SessionGroup[]>(
+    `/api/session-groups/${encodeURIComponent(groupId)}/position`,
+    jsonRequest("PATCH", { beforeGroupId }),
+  );
+}
+
+export function deleteSessionGroup(groupId: string) {
+  return request<SessionSummary[]>(
+    `/api/session-groups/${encodeURIComponent(groupId)}`,
+    { method: "DELETE" },
+  );
+}
+
 export function updateSession(
   sessionId: string,
   update: { title?: string; draft?: SessionDraft },
@@ -172,6 +210,17 @@ export function updateSession(
   return request<SessionDetail>(
     `/api/sessions/${encodeURIComponent(sessionId)}`,
     jsonRequest("PATCH", update),
+  );
+}
+
+export function moveSession(
+  sessionId: string,
+  groupId: string | null,
+  beforeSessionId: string | null,
+) {
+  return request<SessionSummary[]>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/position`,
+    jsonRequest("PATCH", { groupId, beforeSessionId }),
   );
 }
 

@@ -50,13 +50,40 @@ export const sessions = sqliteTable(
   {
     id: text("id").primaryKey(),
     ownerId: text("owner_id").notNull(),
+    groupId: text("group_id").references(() => sessionGroups.id, {
+      onDelete: "set null",
+    }),
     title: text("title").notNull(),
     draftJson: text("draft_json").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
   (table) => [
     index("sessions_owner_updated_idx").on(table.ownerId, table.updatedAt),
+    index("sessions_group_order_idx").on(table.groupId, table.sortOrder),
+  ],
+);
+
+export const sessionGroups = sqliteTable(
+  "session_groups",
+  {
+    id: text("id").primaryKey(),
+    ownerId: text("owner_id").notNull(),
+    title: text("title").notNull(),
+    isArchived: integer("is_archived", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    index("session_groups_owner_order_idx").on(
+      table.ownerId,
+      table.isArchived,
+      table.sortOrder,
+    ),
   ],
 );
 

@@ -64,6 +64,13 @@
       "when": 1788036583411,
       "tag": "0008_far_argent",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1789393446939,
+      "tag": "0009_curved_natasha_romanoff",
+      "breakpoints": true
     }
   ]
 }

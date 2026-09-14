@@ -5,14 +5,20 @@ import {
   cancelJob,
   clearGenerationLog,
   createSession,
+  createSessionGroup,
   createRun,
   deleteAsset,
   deleteSession,
+  deleteSessionGroup,
   dismissJob,
   getSession,
   listSessions,
+  listSessionGroups,
+  moveSession as moveSessionRequest,
+  moveSessionGroup as moveSessionGroupRequest,
   updateAsset,
   updateSession,
+  updateSessionGroup,
 } from "./api.js";
 import type { AuthMode, Identity } from "./api.js";
 import { ChangePasswordScreen } from "./components/ChangePasswordScreen.js";
@@ -23,6 +29,7 @@ import type {
   SessionDetail,
   SessionDraft,
   SessionSummary,
+  SessionGroup,
   Asset,
 } from "../shared/contracts.js";
 import { composePrompt, createEmptyDraft } from "../shared/contracts.js";
@@ -55,7 +62,9 @@ function preferredTheme(): Theme {
 function summaryFromDetail(detail: SessionDetail): SessionSummary {
   return {
     id: detail.id,
+    groupId: detail.groupId,
     title: detail.title,
+    sortOrder: detail.sortOrder,
     createdAt: detail.createdAt,
     updatedAt: detail.updatedAt,
     knownCostMicrousd: detail.knownCostMicrousd,
@@ -65,8 +74,10 @@ function summaryFromDetail(detail: SessionDetail): SessionSummary {
 }
 
 function sortSessions(sessions: SessionSummary[]) {
-  return [...sessions].sort((left, right) =>
-    right.updatedAt.localeCompare(left.updatedAt),
+  return [...sessions].sort(
+    (left, right) =>
+      left.sortOrder - right.sortOrder ||
+      right.updatedAt.localeCompare(left.updatedAt),
   );
 }
 
@@ -104,6 +115,7 @@ export function App({
   const readOnly = authMode === "demo";
   const [connection, setConnection] = useState<ConnectionState>("checking");
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [sessionGroups, setSessionGroups] = useState<SessionGroup[]>([]);
   const [activeSession, setActiveSession] = useState<SessionDetail | null>(
     null,
   );
@@ -219,8 +231,12 @@ export function App({
 
     async function loadWorkspace() {
       try {
-        const sessionList = await listSessions(controller.signal);
+        const [sessionList, groupList] = await Promise.all([
+          listSessions(controller.signal),
+          listSessionGroups(controller.signal),
+        ]);
         setSessions(sessionList);
+        setSessionGroups(groupList);
         setConnection("connected");
 
         const requestedSessionId = new URL(
@@ -486,6 +502,28 @@ export function App({
     }
   }
 
+  async function handleCreateGroup(title: string) {
+    if (readOnly) return false;
+
+    try {
+      setError(null);
+      const group = await createSessionGroup(title);
+      setSessionGroups((current) => [
+        ...current.filter((item) => !item.isArchived),
+        group,
+        ...current.filter((item) => item.isArchived),
+      ]);
+      return true;
+    } catch (createError) {
+      setError(
+        createError instanceof Error
+          ? createError.message
+          : "The group could not be created.",
+      );
+      return false;
+    }
+  }
+
   async function handleOpen(sessionId: string) {
     setDrawerOpen(false);
 
@@ -545,6 +583,139 @@ export function App({
           : "The session could not be renamed.",
       );
       return false;
+    }
+  }
+
+  async function handleRenameGroup(groupId: string, title: string) {
+    if (readOnly) return false;
+
+    try {
+      setError(null);
+      const updated = await updateSessionGroup(groupId, title);
+      setSessionGroups((current) =>
+        current.map((group) => (group.id === updated.id ? updated : group)),
+      );
+      return true;
+    } catch (renameError) {
+      setError(
+        renameError instanceof Error
+          ? renameError.message
+          : "The group could not be renamed.",
+      );
+      return false;
+    }
+  }
+
+  async function moveSessionGroup(
+    groupId: string,
+    beforeGroupId: string | null,
+  ) {
+    if (readOnly) return;
+
+    try {
+      setError(null);
+      setSessionGroups(await moveSessionGroupRequest(groupId, beforeGroupId));
+    } catch (moveError) {
+      setError(
+        moveError instanceof Error
+          ? moveError.message
+          : "The group could not be moved.",
+      );
+    }
+  }
+
+  async function handleDeleteGroup(group: SessionGroup) {
+    if (readOnly || group.isArchived) return;
+    if (
+      !window.confirm(
+        `Delete group “${group.title}”? Its sessions will move to Sessions.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setError(null);
+      applySessionOrder(await deleteSessionGroup(group.id));
+      setSessionGroups((current) =>
+        current.filter((item) => item.id !== group.id),
+      );
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "The group could not be deleted.",
+      );
+    }
+  }
+
+  function applySessionOrder(nextSessions: SessionSummary[]) {
+    setSessions(nextSessions);
+    const current = activeSessionRef.current;
+    const summary = current
+      ? nextSessions.find((session) => session.id === current.id)
+      : null;
+    if (current && summary) {
+      const currentDetail = { ...current, ...summary, draft: draftRef.current };
+      activeSessionRef.current = currentDetail;
+      setActiveSession(currentDetail);
+    }
+  }
+
+  async function moveSession(
+    sessionId: string,
+    groupId: string | null,
+    beforeSessionId: string | null = null,
+  ) {
+    if (readOnly) return;
+    const session = sessions.find((item) => item.id === sessionId);
+    if (!session) return;
+
+    try {
+      setError(null);
+      applySessionOrder(
+        await moveSessionRequest(sessionId, groupId, beforeSessionId),
+      );
+    } catch (moveError) {
+      setError(
+        moveError instanceof Error
+          ? moveError.message
+          : "The session could not be moved.",
+      );
+    }
+  }
+
+  async function moveSessionOntoSession(sessionId: string, targetId: string) {
+    if (readOnly || sessionId === targetId) return;
+    const source = sessions.find((item) => item.id === sessionId);
+    const target = sessions.find((item) => item.id === targetId);
+    if (!source || !target) return;
+
+    try {
+      setError(null);
+      let groupId = target.groupId;
+      let createdGroup: SessionGroup | null = null;
+      if (!groupId) {
+        createdGroup = await createSessionGroup(target.title);
+        groupId = createdGroup.id;
+      }
+
+      let nextSessions = await moveSessionRequest(target.id, groupId, null);
+      nextSessions = await moveSessionRequest(source.id, groupId, null);
+      if (createdGroup) {
+        setSessionGroups((current) => [
+          ...current.filter((item) => !item.isArchived),
+          createdGroup,
+          ...current.filter((item) => item.isArchived),
+        ]);
+      }
+      applySessionOrder(nextSessions);
+    } catch (moveError) {
+      setError(
+        moveError instanceof Error
+          ? moveError.message
+          : "The sessions could not be grouped.",
+      );
     }
   }
 
@@ -717,6 +888,7 @@ export function App({
         <SessionSidebar
           collapsed={sessionsCollapsed}
           sessions={sessions}
+          groups={sessionGroups}
           activeSessionId={activeSession?.id ?? null}
           user={identity.user}
           connection={connection}
@@ -734,8 +906,14 @@ export function App({
           onChangePassword={() => setChangingPassword(true)}
           onLogout={onLogout}
           onCreate={handleCreate}
+          onCreateGroup={handleCreateGroup}
           onOpen={(sessionId) => void handleOpen(sessionId)}
           onRename={handleRename}
+          onRenameGroup={handleRenameGroup}
+          onMoveGroup={moveSessionGroup}
+          onDeleteGroup={(group) => void handleDeleteGroup(group)}
+          onMove={moveSession}
+          onGroupSession={moveSessionOntoSession}
           onDelete={(session) => void handleDelete(session)}
           onCollapse={() => setSessionsCollapsed(true)}
           onExpand={() => setSessionsCollapsed(false)}

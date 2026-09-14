@@ -175,6 +175,132 @@ describe("session API", () => {
     await app.close();
   });
 
+  it("orders and deletes groups without deleting their sessions", async () => {
+    const app = await createTestApp();
+    const first = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      payload: { title: "First" },
+    });
+    const second = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      payload: { title: "Second" },
+    });
+    const firstId = first.json<{ id: string }>().id;
+    const secondId = second.json<{ id: string }>().id;
+
+    const groupResponse = await app.inject({
+      method: "POST",
+      url: "/api/session-groups",
+      payload: { title: "Studies" },
+    });
+    const groupId = groupResponse.json<{ id: string }>().id;
+    expect(groupResponse.statusCode).toBe(201);
+    const secondGroupResponse = await app.inject({
+      method: "POST",
+      url: "/api/session-groups",
+      payload: { title: "Finals" },
+    });
+    const secondGroupId = secondGroupResponse.json<{ id: string }>().id;
+
+    const moveFirstResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/sessions/${firstId}/position`,
+      payload: { groupId, beforeSessionId: null },
+    });
+    const moveSecondResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/sessions/${secondId}/position`,
+      payload: { groupId, beforeSessionId: firstId },
+    });
+    expect(moveFirstResponse.statusCode).toBe(200);
+    expect(moveSecondResponse.statusCode).toBe(200);
+    expect(
+      moveSecondResponse
+        .json<Array<{ id: string; groupId: string; sortOrder: number }>>()
+        .filter((session) => session.groupId === groupId),
+    ).toEqual([
+      expect.objectContaining({ id: secondId, sortOrder: 0 }),
+      expect.objectContaining({ id: firstId, sortOrder: 1 }),
+    ]);
+
+    const groupsResponse = await app.inject({
+      method: "GET",
+      url: "/api/session-groups",
+    });
+    const groups =
+      groupsResponse.json<Array<{ title: string; isArchived: boolean }>>();
+    expect(groups).toHaveLength(3);
+    expect(groups[0]).toMatchObject({ title: "Studies", isArchived: false });
+    expect(groups[1]).toMatchObject({ title: "Finals", isArchived: false });
+    expect(groups[2]).toMatchObject({ title: "Archived", isArchived: true });
+
+    const reorderResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/session-groups/${secondGroupId}/position`,
+      payload: { beforeGroupId: groupId },
+    });
+    expect(reorderResponse.statusCode).toBe(200);
+    expect(
+      reorderResponse.json<
+        Array<{ id: string; isArchived: boolean; sortOrder: number }>
+      >(),
+    ).toEqual([
+      expect.objectContaining({ id: secondGroupId, sortOrder: 0 }),
+      expect.objectContaining({ id: groupId, sortOrder: 1 }),
+      expect.objectContaining({ isArchived: true }),
+    ]);
+
+    const archivedId = groupsResponse
+      .json<Array<{ id: string; isArchived: boolean }>>()
+      .find((group) => group.isArchived)?.id;
+    const archiveResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/sessions/${firstId}/position`,
+      payload: { groupId: archivedId, beforeSessionId: null },
+    });
+    expect(archiveResponse.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: firstId, groupId: archivedId }),
+      ]),
+    );
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/sessions",
+    });
+    expect(listResponse.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: firstId, groupId: archivedId }),
+        expect.objectContaining({ id: secondId, groupId }),
+      ]),
+    );
+
+    const deleteGroupResponse = await app.inject({
+      method: "DELETE",
+      url: `/api/session-groups/${groupId}`,
+    });
+    expect(deleteGroupResponse.statusCode).toBe(200);
+    expect(deleteGroupResponse.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: secondId, groupId: null }),
+        expect.objectContaining({ id: firstId, groupId: archivedId }),
+      ]),
+    );
+
+    const groupsAfterDelete = await app.inject({
+      method: "GET",
+      url: "/api/session-groups",
+    });
+    expect(groupsAfterDelete.json()).toEqual([
+      expect.objectContaining({ id: secondGroupId }),
+      expect.objectContaining({ id: archivedId, isArchived: true }),
+    ]);
+
+    await app.close();
+  });
+
   it("rejects cross-origin mutations", async () => {
     const app = await createTestApp();
     const response = await app.inject({

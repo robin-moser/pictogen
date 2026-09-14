@@ -395,7 +395,9 @@ export type ModelCatalog = Static<typeof ModelCatalogSchema>;
 export const SessionSummarySchema = Type.Object(
   {
     id: Type.String(),
+    groupId: Type.Union([Type.String(), Type.Null()]),
     title: Type.String(),
+    sortOrder: Type.Integer(),
     createdAt: Type.String(),
     updatedAt: Type.String(),
     knownCostMicrousd: Type.Integer({ minimum: 0 }),
@@ -406,6 +408,20 @@ export const SessionSummarySchema = Type.Object(
 );
 
 export type SessionSummary = Static<typeof SessionSummarySchema>;
+
+export const SessionGroupSchema = Type.Object(
+  {
+    id: Type.String(),
+    title: Type.String(),
+    isArchived: Type.Boolean(),
+    sortOrder: Type.Integer(),
+    createdAt: Type.String(),
+    updatedAt: Type.String(),
+  },
+  { additionalProperties: false },
+);
+
+export type SessionGroup = Static<typeof SessionGroupSchema>;
 
 export const SessionDetailSchema = Type.Intersect([
   SessionSummarySchema,
