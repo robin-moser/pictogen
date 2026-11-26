@@ -1,0 +1,10 @@
+# pictogen-url: https://pictogen.example.com
+# Replace the origin above. It must match PICTOGEN_URL if that is set.
+# Copy this file outside the skill to ~/.config/pictogen/curl.conf (mode 0600).
+# Uncomment and configure one authentication method:
+
+# TinyAuth ForwardAuth: Basic followed by base64 of username:password.
+# header = "Proxy-Authorization: Basic REPLACE_ME"
+
+# Pictogen local auth: path to the cookie jar saved by /api/auth/login.
+# cookie = "/absolute/path/to/pictogen.cookies"

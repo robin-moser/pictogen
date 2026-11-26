@@ -82,6 +82,17 @@ npm run dev
 The frontend runs at `http://localhost:5173` and proxies API requests to the
 Fastify server at `http://localhost:3000`.
 
+## Agent access
+
+The [Pictogen skill](skills/pictogen/SKILL.md) uses the same API as the web app
+to generate images, view thumbnails, download originals, and organize sessions
+and groups. It works against an existing deployment. Copy or symlink
+`skills/pictogen` into your agent's skills directory (for example,
+`~/.config/opencode/skills/` for OpenCode). Use the [example curl
+config](skills/pictogen/curl.conf.example) to set the instance URL and
+authentication in `~/.config/pictogen/curl.conf`, outside the repo.
+`PICTOGEN_URL` overrides the URL and is required without that file.
+
 ## Authentication
 
 `AUTH_MODE` is required and accepts exactly one value: `local`, `forward-auth`,

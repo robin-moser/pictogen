@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+set -e
+
+fail() {
+  printf 'pictogen: %s\n' "$1" >&2
+  exit 1
+}
+
+usage() {
+  cat >&2 <<'EOF'
+Usage:
+  pictogen GET /api/path [output-file]
+  pictogen POST /api/path <json-file|-> [idempotency-key]
+  pictogen PATCH /api/path <json-file|->
+EOF
+  exit 2
+}
+
+[[ $# -ge 2 && $2 == /api/* ]] || usage
+method=$1
+path=$2
+shift 2
+
+args=()
+case "$method" in
+  GET)
+    [[ $# -le 1 ]] || usage
+    if [[ $# -eq 1 ]]; then args+=(--output "$1"); fi
+    ;;
+  POST|PATCH)
+    [[ $# -ge 1 && $# -le 2 ]] || usage
+    args+=(--json "@$1")
+    if [[ $# -eq 2 ]]; then
+      [[ $method == POST && $2 =~ ^[a-zA-Z0-9._-]+$ ]] || usage
+      args+=(--header "Idempotency-Key: $2")
+    fi
+    ;;
+  *) usage ;;
+esac
+
+if [[ ${PICTOGEN_CURL_CONFIG+x} ]]; then
+  config=$PICTOGEN_CURL_CONFIG
+else
+  config=${XDG_CONFIG_HOME:-$HOME/.config}/pictogen/curl.conf
+  [[ -e $config ]] || config=
+fi
+
+config_origin=
+if [[ -n $config ]]; then
+  [[ -f $config && -r $config ]] || fail 'The curl auth config is not readable.'
+  IFS= read -r first_line < "$config" || true
+  if [[ $first_line == '# pictogen-url: '* ]]; then
+    config_origin=${first_line#'# pictogen-url: '}
+    config_origin=${config_origin%/}
+  elif [[ ! ${PICTOGEN_CURL_CONFIG+x} ]]; then
+    fail 'Start the default curl auth config with # pictogen-url: followed by the instance origin.'
+  fi
+fi
+
+origin=${PICTOGEN_URL:-$config_origin}
+origin=${origin%/}
+origin_pattern='^(https?)://([a-zA-Z0-9.-]+|\[[a-fA-F0-9:]+\])(:[0-9]+)?$'
+[[ $origin =~ $origin_pattern ]] || fail 'No instance origin: set PICTOGEN_URL or add # pictogen-url: to the curl config (no path).'
+if [[ ${BASH_REMATCH[1]} == http ]]; then
+  case "${BASH_REMATCH[2]}" in
+    localhost|127.0.0.1|'[::1]') ;;
+    *) fail 'The Pictogen origin must use HTTPS except on loopback.' ;;
+  esac
+fi
+
+auth=()
+if [[ -n $config ]]; then
+  # Prevent accidental credential reuse when switching the instance URL.
+  [[ -z $config_origin || $config_origin == "$origin" ]] || fail 'The curl auth config is for a different Pictogen origin.'
+  auth=(--config "$config")
+fi
+
+exec curl --disable "${auth[@]}" --no-location --globoff --silent --show-error \
+  --fail-with-body --connect-timeout 10 --max-time 90 \
+  --write-out '%{stderr}HTTP %{http_code}\n' \
+  --request "$method" "${args[@]}" -- "$origin$path"
