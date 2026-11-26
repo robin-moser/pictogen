@@ -96,6 +96,27 @@ jq -nc --arg title "$TITLE" '{title: $title}' |
 Use `-` to read a JSON body from stdin, or pass a file path. For PATCH use
 the same argument order with `PATCH`.
 
+## Resolve session references
+
+When the user asks for a session's reference image without specifying an asset,
+use the saved selection visible in the frontend's **Working Prompt**:
+`draft.referenceAssetIds` from `GET /api/sessions/$SESSION_ID`. Resolve those
+IDs against both `references[]` (uploads) and `runs[].jobs[].outputs[]`
+(generated images), preserving selection order. The uploads list does not
+indicate which images are selected. For an explicitly requested upload or
+output, use that asset instead.
+
+If the draft has no selection, an ID cannot be resolved, or the user asks for
+one image and several are selected, ask which asset to use before generating.
+For a new session, download the selected asset's original bytes and upload
+them to the destination via multipart `POST /api/assets`, with the destination
+`sessionId` field before the `file` part. Use the returned asset ID in the run.
+
+```bash
+"$PICTOGEN" GET "/api/assets/$ASSET_ID" "$IMAGE_FILE"
+"$PICTOGEN" POST /api/assets --reference "$DESTINATION_SESSION_ID" "$IMAGE_FILE"
+```
+
 ## Generate and inspect
 
 1. Call `"$PICTOGEN" GET /api/models`. Use the catalog's `providerId`,
@@ -134,6 +155,10 @@ the same argument order with `PATCH`.
    ```bash
    "$PICTOGEN" POST "/api/sessions/$SESSION_ID/runs" "$RUN_JSON" "$RUN_KEY"
    ```
+
+   The run saves its prompt and references in history; it does not update the
+   session's Working Prompt. In the frontend, use **Restore prompt and
+   references** on a result to load that run into the editor.
 
 3. The `202` response contains `run.id` and `run.jobs`. Get session detail and
    select that run ID to check progress. Check again after a few seconds if any

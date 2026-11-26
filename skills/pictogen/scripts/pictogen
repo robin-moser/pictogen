@@ -11,6 +11,7 @@ usage() {
 Usage:
   pictogen GET /api/path [output-file]
   pictogen POST /api/path <json-file|-> [idempotency-key]
+  pictogen POST /api/assets --reference <session-id> <image-file>
   pictogen PATCH /api/path <json-file|->
 EOF
   exit 2
@@ -28,11 +29,17 @@ case "$method" in
     if [[ $# -eq 1 ]]; then args+=(--output "$1"); fi
     ;;
   POST|PATCH)
-    [[ $# -ge 1 && $# -le 2 ]] || usage
-    args+=(--json "@$1")
-    if [[ $# -eq 2 ]]; then
-      [[ $method == POST && $2 =~ ^[a-zA-Z0-9._-]+$ ]] || usage
-      args+=(--header "Idempotency-Key: $2")
+    if [[ $method == POST && $path == /api/assets && ${1:-} == --reference ]]; then
+      [[ $# -eq 3 && -n $2 && -f $3 && -r $3 ]] || usage
+      args+=(--form-string "sessionId=$2" --form 'file=@-;filename=reference')
+      exec < "$3"
+    else
+      [[ $# -ge 1 && $# -le 2 ]] || usage
+      args+=(--json "@$1")
+      if [[ $# -eq 2 ]]; then
+        [[ $method == POST && $2 =~ ^[a-zA-Z0-9._-]+$ ]] || usage
+        args+=(--header "Idempotency-Key: $2")
+      fi
     fi
     ;;
   *) usage ;;
